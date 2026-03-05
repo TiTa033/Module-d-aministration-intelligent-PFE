@@ -1,24 +1,40 @@
 package talan.pfe.rulengine.entites;
+
 import jakarta.persistence.*;
 import lombok.*;
 import talan.pfe.rulengine.enums.Role;
 
-@Entity @Table(name="users")
-@Data
+import java.util.UUID;
+
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class User {
+
     @Id
-    @GeneratedValue(strategy=GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(updatable = false, nullable = false)
+    private UUID id;
+
+    @Column(nullable = false, unique = true)
     private String email;
+
+    @Column(name = "password_hash")
     private String passwordHash;
+
     @Enumerated(EnumType.STRING)
-    @Column(nullable=false)
+    @Column(nullable = false)
     private Role role;
-    private Long tenantId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private Tenant tenant;
 
-//    @ManyToOne(fetch=FetchType.LAZY)
-//    @JoinColumn(name="tenantId",insertable=false,updatable=false)
-//    private Tenant tenant;
-
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean active = true;
 }

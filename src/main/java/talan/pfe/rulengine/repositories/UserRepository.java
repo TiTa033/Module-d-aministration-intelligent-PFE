@@ -7,10 +7,15 @@ import talan.pfe.rulengine.enums.Role;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
-    List<User> findAllByTenantId(Long tenantId);
-    List<User> findAllByTenantIdAndRole(Long tenantId, Role role);
+
+    List<User> findAllByTenantId(UUID tenantId);
+    List<User> findAllByTenantIdAndRole(UUID tenantId, Role role);
+
+    boolean existsByEmailAndTenantId(String email, UUID tenantId);
 }

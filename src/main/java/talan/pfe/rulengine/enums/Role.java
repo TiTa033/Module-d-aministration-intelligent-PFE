@@ -1,2 +1,4 @@
 package talan.pfe.rulengine.enums;
-public enum Role { ADMIN, MANAGER, VIEWER }
+public enum Role {
+    GLOBAL_ADMIN,ADMIN, MANAGER, VIEWER
+}
