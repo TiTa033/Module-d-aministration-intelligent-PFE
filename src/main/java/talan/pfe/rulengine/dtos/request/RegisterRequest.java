@@ -1,8 +1,11 @@
 package talan.pfe.rulengine.dtos.request;
 
-
 import jakarta.validation.constraints.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import talan.pfe.rulengine.enums.Role;
 
 @Getter
 @Setter
@@ -26,4 +29,7 @@ public class RegisterRequest {
 
     @NotBlank(message = "Tenant ID is required")
     private String tenantId;
+
+    // Optional: if null, role will default to VIEWER in AuthService
+    private Role role;
 }
