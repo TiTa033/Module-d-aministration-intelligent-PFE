@@ -61,10 +61,12 @@ public class AuthService {
                 .orElseThrow(() ->
                         new IllegalArgumentException("Tenant not found"));
 
+        Role role = request.getRole() != null ? request.getRole() : Role.VIEWER;
+
         User user = User.builder()
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(Role.VIEWER) // default role on register
+                .role(role)
                 .tenant(tenant)
                 .build();
 
