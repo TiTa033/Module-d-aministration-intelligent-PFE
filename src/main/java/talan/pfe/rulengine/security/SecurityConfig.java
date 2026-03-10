@@ -30,20 +30,7 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
-                        .requestMatchers(
-                                "/api/auth/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/api-docs/**"
-                        ).permitAll()
-                        // Role-based access
-                        .requestMatchers("/api/admin/tenants/**")
-                        .hasRole("GLOBAL_ADMIN")
-                        .requestMatchers("/api/admin/**")
-                        .hasAnyRole("GLOBAL_ADMIN", "ADMIN")
-                        // Everything else requires authentication
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
