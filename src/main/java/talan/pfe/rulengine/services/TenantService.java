@@ -54,13 +54,16 @@ public class TenantService {
             String sortBy,
             String sortDir) {
 
+        // Pass empty string instead of null for search
+        String searchParam = (search == null) ? "" : search;
+
         TenantStatus tenantStatus = null;
         if (status != null && !status.isBlank()) {
             try {
                 tenantStatus = TenantStatus.valueOf(status.toUpperCase());
             } catch (IllegalArgumentException e) {
                 throw new BadRequestException(
-                        "Invalid status value. Must be ACTIVE or INACTIVE");
+                        "Invalid status. Must be ACTIVE or INACTIVE");
             }
         }
 
@@ -71,7 +74,7 @@ public class TenantService {
         Pageable pageable = PageRequest.of(page, size, sort);
 
         Page<TenantResponse> tenantPage = tenantRepository
-                .findAllWithFilters(search, tenantStatus, pageable)
+                .findAllWithFilters(searchParam, tenantStatus, pageable)
                 .map(tenant -> {
                     long totalUsers =
                             tenantRepository.countUsersByTenantId(tenant.getId());

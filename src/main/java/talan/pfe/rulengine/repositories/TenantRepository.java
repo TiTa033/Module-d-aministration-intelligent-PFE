@@ -23,7 +23,7 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
 
     // Search by name or slug with optional status filter
     @Query("SELECT t FROM Tenant t WHERE " +
-            "(:search IS NULL OR LOWER(t.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "(:search = '' OR LOWER(t.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(t.slug) LIKE LOWER(CONCAT('%', :search, '%'))) " +
             "AND (:status IS NULL OR t.status = :status)")
     Page<Tenant> findAllWithFilters(

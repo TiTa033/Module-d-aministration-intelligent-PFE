@@ -73,6 +73,7 @@ public class TenantController {
         return ResponseEntity.ok(tenantService.deactivate(id));
     }
 
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a tenant — only if it has no users")
     public ResponseEntity<Void> delete(
