@@ -20,6 +20,9 @@ public class User {
     @Column(updatable = false, nullable = false)
     private UUID id;
 
+    @Column(name = "name")
+    private String name;
+
     @Column(nullable = false, unique = true)
     private String email;
 

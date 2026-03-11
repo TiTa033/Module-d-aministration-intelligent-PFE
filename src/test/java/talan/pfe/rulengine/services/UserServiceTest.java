@@ -8,7 +8,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import talan.pfe.rulengine.dtos.request.CreateUserRequest;
 import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.entites.User;
@@ -37,9 +36,6 @@ class UserServiceTest {
     @Mock
     private TenantRepository tenantRepository;
 
-    @Mock
-    private PasswordEncoder passwordEncoder;
-
     @InjectMocks
     private UserService userService;
 
@@ -59,8 +55,8 @@ class UserServiceTest {
                 .build();
 
         createRequest = new CreateUserRequest();
+        createRequest.setName("Test User");
         createRequest.setEmail("user@test.com");
-        createRequest.setPassword("password123");
         createRequest.setRole(Role.VIEWER);
     }
 
@@ -69,30 +65,32 @@ class UserServiceTest {
     class Create {
 
         @Test
-        @DisplayName("doit créer un utilisateur avec succès")
-        void shouldCreateUserSuccessfully() {
+        @DisplayName("doit donner l acces a un utilisateur deja inscrit")
+        void shouldGrantAccessToExistingUser() {
             when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
-            when(userRepository.existsByEmailAndTenantId(createRequest.getEmail(), tenantId))
-                    .thenReturn(false);
-            when(passwordEncoder.encode(createRequest.getPassword()))
-                    .thenReturn("encodedPassword");
-
-            User savedUser = User.builder()
+            User existingUser = User.builder()
                     .id(UUID.randomUUID())
+                    .name("Old Name")
                     .email(createRequest.getEmail())
-                    .passwordHash("encodedPassword")
+                    .passwordHash("existingPasswordHash")
                     .role(Role.VIEWER)
                     .tenant(tenant)
-                    .active(true)
+                    .active(false)
                     .build();
-            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+            when(userRepository.findByEmail(createRequest.getEmail()))
+                    .thenReturn(Optional.of(existingUser));
+
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
             User result = userService.create(createRequest, tenantId);
 
             assertThat(result).isNotNull();
+            assertThat(result.getName()).isEqualTo("Test User");
             assertThat(result.getEmail()).isEqualTo("user@test.com");
             assertThat(result.getRole()).isEqualTo(Role.VIEWER);
             assertThat(result.getTenant()).isEqualTo(tenant);
+            assertThat(result.getPasswordHash()).isEqualTo("existingPasswordHash");
+            assertThat(result.isActive()).isTrue();
             verify(userRepository).save(any(User.class));
         }
 
@@ -107,15 +105,44 @@ class UserServiceTest {
         }
 
         @Test
-        @DisplayName("doit lever une exception si l'email existe déjà pour le tenant")
-        void shouldThrowWhenEmailAlreadyExists() {
+        @DisplayName("doit lever une exception si l utilisateur n est pas encore inscrit")
+        void shouldThrowWhenUserIsNotRegistered() {
             when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
-            when(userRepository.existsByEmailAndTenantId(createRequest.getEmail(), tenantId))
-                    .thenReturn(true);
+            when(userRepository.findByEmail(createRequest.getEmail()))
+                    .thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> userService.create(createRequest, tenantId))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Email already used for this tenant");
+                    .hasMessageContaining("Cet utilisateur doit deja etre inscrit avant de recevoir un acces");
+            verify(userRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("doit lever une exception si l utilisateur appartient a un autre tenant")
+        void shouldThrowWhenUserBelongsToAnotherTenant() {
+            UUID anotherTenantId = UUID.randomUUID();
+            Tenant anotherTenant = Tenant.builder()
+                    .id(anotherTenantId)
+                    .name("Another Tenant")
+                    .slug("another-tenant")
+                    .status(TenantStatus.ACTIVE)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+            when(userRepository.findByEmail(createRequest.getEmail()))
+                    .thenReturn(Optional.of(User.builder()
+                            .id(UUID.randomUUID())
+                            .email(createRequest.getEmail())
+                            .passwordHash("existingPasswordHash")
+                            .role(Role.VIEWER)
+                            .tenant(anotherTenant)
+                            .active(true)
+                            .build()));
+
+            assertThatThrownBy(() -> userService.create(createRequest, tenantId))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Cet utilisateur est deja rattache a un autre tenant");
             verify(userRepository, never()).save(any());
         }
     }
@@ -134,9 +161,9 @@ class UserServiceTest {
                     .role(Role.ADMIN)
                     .tenant(tenant)
                     .build();
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Optional.of(user));
 
-            User result = userService.getById(userId);
+            User result = userService.getById(userId, tenantId);
 
             assertThat(result).isNotNull();
             assertThat(result.getId()).isEqualTo(userId);
@@ -147,9 +174,9 @@ class UserServiceTest {
         @DisplayName("doit lever une exception si l'utilisateur n'existe pas")
         void shouldThrowWhenUserNotFound() {
             UUID userId = UUID.randomUUID();
-            when(userRepository.findById(userId)).thenReturn(Optional.empty());
+            when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> userService.getById(userId))
+            assertThatThrownBy(() -> userService.getById(userId, tenantId))
                     .isInstanceOf(NoSuchElementException.class);
         }
     }
@@ -196,11 +223,17 @@ class UserServiceTest {
         @DisplayName("doit supprimer l'utilisateur")
         void shouldDeleteUser() {
             UUID userId = UUID.randomUUID();
-            doNothing().when(userRepository).deleteById(userId);
+            User user = User.builder()
+                    .id(userId)
+                    .email("user@test.com")
+                    .role(Role.VIEWER)
+                    .tenant(tenant)
+                    .build();
+            when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Optional.of(user));
 
-            userService.delete(userId);
+            userService.delete(userId, tenantId);
 
-            verify(userRepository).deleteById(userId);
+            verify(userRepository).delete(user);
         }
     }
 
@@ -219,10 +252,10 @@ class UserServiceTest {
                     .tenant(tenant)
                     .active(false)
                     .build();
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Optional.of(user));
             when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            User result = userService.setActive(userId, true);
+            User result = userService.setActive(userId, tenantId, true);
 
             assertThat(result.isActive()).isTrue();
             verify(userRepository).save(user);
@@ -239,10 +272,10 @@ class UserServiceTest {
                     .tenant(tenant)
                     .active(true)
                     .build();
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Optional.of(user));
             when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            User result = userService.setActive(userId, false);
+            User result = userService.setActive(userId, tenantId, false);
 
             assertThat(result.isActive()).isFalse();
         }
@@ -262,10 +295,10 @@ class UserServiceTest {
                     .role(Role.VIEWER)
                     .tenant(tenant)
                     .build();
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Optional.of(user));
             when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            User result = userService.changeRole(userId, Role.ADMIN);
+            User result = userService.changeRole(userId, tenantId, Role.ADMIN);
 
             assertThat(result.getRole()).isEqualTo(Role.ADMIN);
             verify(userRepository).save(user);

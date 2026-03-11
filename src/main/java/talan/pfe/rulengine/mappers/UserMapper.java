@@ -14,9 +14,11 @@ public class UserMapper {
         if (user == null) return null;
         return UserResponse.builder()
                 .id(user.getId())
+                .name(user.getName())
                 .email(user.getEmail())
                 .role(user.getRole())
                 .tenantId(user.getTenant() != null ? user.getTenant().getId() : null)
+                .tenantName(user.getTenant() != null ? user.getTenant().getName() : null)
                 .active(user.isActive())
                 .build();
     }
