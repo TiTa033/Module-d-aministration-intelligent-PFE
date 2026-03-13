@@ -2,11 +2,12 @@ package talan.pfe.rulengine.services;
 
 
 import lombok.RequiredArgsConstructor;
+import talan.pfe.rulengine.dtos.response.TenantResponse;
 import talan.pfe.rulengine.exception.BadRequestException;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import talan.pfe.rulengine.dtos.request.PageResponse;
+import talan.pfe.rulengine.dtos.response.PageResponse;
 import talan.pfe.rulengine.dtos.request.*;
 import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.enums.TenantStatus;

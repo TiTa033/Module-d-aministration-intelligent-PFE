@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.*;
 import talan.pfe.rulengine.dtos.request.CreateTenantRequest;
-import talan.pfe.rulengine.dtos.request.TenantResponse;
+import talan.pfe.rulengine.dtos.response.TenantResponse;
 import talan.pfe.rulengine.dtos.request.UpdateTenantRequest;
 import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.enums.TenantStatus;
@@ -16,7 +16,6 @@ import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ConflictException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
 import talan.pfe.rulengine.repositories.TenantRepository;
-import talan.pfe.rulengine.services.TenantService;
 
 import java.time.LocalDateTime;
 import java.util.List;
