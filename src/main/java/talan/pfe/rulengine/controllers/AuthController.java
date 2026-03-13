@@ -7,7 +7,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import talan.pfe.rulengine.dtos.request.*;
+import talan.pfe.rulengine.dtos.response.AuthResponse;
 import talan.pfe.rulengine.services.AuthService;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -23,6 +26,13 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PostMapping("/verify-otp")
+    @Operation(summary = "Verify OTP code → returns access + refresh tokens")
+    public ResponseEntity<AuthResponse> verifyOtp(
+            @Valid @RequestBody VerifyOtpRequest request) {
+        return ResponseEntity.ok(authService.verifyOtp(request));
     }
 
     @PostMapping("/register")
@@ -48,6 +58,7 @@ public class AuthController {
         authService.logout(request);
         return ResponseEntity.noContent().build();
     }
+
 
     @PostMapping("/forgot-password")
     @Operation(summary = "Send password reset email")
@@ -81,5 +92,11 @@ public class AuthController {
             @Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(token, request);
         return ResponseEntity.noContent().build();
+
+    @PostMapping("/resend-otp")
+    @Operation(summary = "Resend OTP to email")
+    public ResponseEntity<Void> resendOtp(@RequestBody Map<String, String> body) {
+        authService.resendOtp(body.get("email"));
+        return ResponseEntity.ok().build();
     }
 }

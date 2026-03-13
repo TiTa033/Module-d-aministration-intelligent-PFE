@@ -7,12 +7,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import talan.pfe.rulengine.dtos.request.*;
+
 import talan.pfe.rulengine.entites.PasswordResetToken;
 import talan.pfe.rulengine.entites.RefreshToken;
 import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.entites.User;
+
+import talan.pfe.rulengine.dtos.response.AuthResponse;
+import talan.pfe.rulengine.entites.*;
+
 import talan.pfe.rulengine.entites.User;
 import talan.pfe.rulengine.enums.Role;
+import talan.pfe.rulengine.exception.ResourceNotFoundException;
 import talan.pfe.rulengine.exception.TokenException;
 import talan.pfe.rulengine.repositories.PasswordResetTokenRepository;
 import talan.pfe.rulengine.repositories.RefreshTokenRepository;
@@ -34,21 +40,49 @@ public class AuthService {
     private final CustomUserDetailsService userDetailsService;
     private final RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
+
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final MailService mailService;
+
+    private final OtpService otpService;
+    private final EmailService emailService;
+    private final CaptchaService captchaService;
+
 
     // ─── LOGIN ──────────────────────────────────────────────
     @Transactional
     public AuthResponse login(LoginRequest request) {
+        // 1. Verify captcha first
+        captchaService.verify(request.getCaptchaToken());
+
+        // 2. Authenticate credentials
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
-        );
+                        request.getEmail(), request.getPassword()));
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow();
+
+        // 3. Generate and send OTP
+        String otp = otpService.generateAndStore(user.getEmail());
+        emailService.sendOtpEmail(user.getEmail(), otp);
+
+        // 4. Return response telling frontend to show OTP page
+        return AuthResponse.builder()
+                .email(user.getEmail())
+                .requiresOtp(true)
+                .build();
+    }
+
+    @Transactional
+    public AuthResponse verifyOtp(VerifyOtpRequest request) {
+        // 1. Verify OTP from Redis
+        otpService.verify(request.getEmail(), request.getOtpCode());
+
+        // 2. Load user and issue tokens
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found"));
 
         return buildAuthResponse(user);
     }
@@ -179,5 +213,13 @@ public class AuthService {
                 .accessTokenExpiresIn(900000L)
                 .refreshTokenExpiresIn(604800000L)
                 .build();
+    }
+    @Transactional
+    public void resendOtp(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found"));
+        String otp = otpService.generateAndStore(user.getEmail());
+        emailService.sendOtpEmail(user.getEmail(), otp);
     }
 }

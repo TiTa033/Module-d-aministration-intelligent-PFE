@@ -1,4 +1,4 @@
-package talan.pfe.rulengine.dtos.request;
+package talan.pfe.rulengine.dtos.response;
 
 
 import lombok.*;

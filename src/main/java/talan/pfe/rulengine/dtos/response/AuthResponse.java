@@ -1,4 +1,4 @@
-package talan.pfe.rulengine.dtos.request;
+package talan.pfe.rulengine.dtos.response;
 
 import lombok.*;
 
@@ -16,4 +16,7 @@ public class AuthResponse {
     private String tenantId;
     private long accessTokenExpiresIn;
     private long refreshTokenExpiresIn;
+    // true → frontend should show OTP page
+    // false → login complete, tokens are valid
+    private boolean requiresOtp;
 }

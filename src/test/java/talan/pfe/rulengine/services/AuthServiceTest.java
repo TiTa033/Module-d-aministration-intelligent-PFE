@@ -12,7 +12,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import talan.pfe.rulengine.dtos.request.AuthResponse;
+import talan.pfe.rulengine.dtos.response.AuthResponse;
 import talan.pfe.rulengine.dtos.request.LoginRequest;
 import talan.pfe.rulengine.dtos.request.RefreshTokenRequest;
 import talan.pfe.rulengine.entites.RefreshToken;
