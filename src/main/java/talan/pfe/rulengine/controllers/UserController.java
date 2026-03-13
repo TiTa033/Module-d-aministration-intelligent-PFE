@@ -16,7 +16,7 @@ import talan.pfe.rulengine.services.UserService;
 import java.util.List;
 import java.util.UUID;
 @RestController
-@RequestMapping("/tenants/{tenantId}/users")
+@RequestMapping("/api/tenants/{tenantId}/users")
 @Tag(name = "Utilisateurs")
 public class UserController {
 
@@ -37,16 +37,16 @@ public class UserController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VIEWER')")
     public ResponseEntity<List<UserResponse>> getAll(@PathVariable UUID tenantId) {
         return ResponseEntity.ok(userMapper.toDtoList(userService.getByTenant(tenantId)));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VIEWER')")
     public ResponseEntity<UserResponse> getById(@PathVariable UUID tenantId,
                                                @PathVariable UUID id) {
-        return ResponseEntity.ok(userMapper.toDto(userService.getById(id)));
+        return ResponseEntity.ok(userMapper.toDto(userService.getById(id, tenantId)));
     }
 
     @PatchMapping("/{id}/activate")
@@ -54,7 +54,7 @@ public class UserController {
     @Operation(summary = "Activer un utilisateur")
     public ResponseEntity<UserResponse> activate(@PathVariable UUID tenantId,
                                                  @PathVariable UUID id) {
-        return ResponseEntity.ok(userMapper.toDto(userService.setActive(id, true)));
+        return ResponseEntity.ok(userMapper.toDto(userService.setActive(id, tenantId, true)));
     }
 
     @PatchMapping("/{id}/deactivate")
@@ -62,7 +62,7 @@ public class UserController {
     @Operation(summary = "Désactiver un utilisateur")
     public ResponseEntity<UserResponse> deactivate(@PathVariable UUID tenantId,
                                                    @PathVariable UUID id) {
-        return ResponseEntity.ok(userMapper.toDto(userService.setActive(id, false)));
+        return ResponseEntity.ok(userMapper.toDto(userService.setActive(id, tenantId, false)));
     }
 
     @PatchMapping("/{id}/role")
@@ -71,14 +71,14 @@ public class UserController {
     public ResponseEntity<UserResponse> changeRole(@PathVariable UUID tenantId,
                                                    @PathVariable UUID id,
                                                    @RequestParam Role role) {
-        return ResponseEntity.ok(userMapper.toDto(userService.changeRole(id, role)));
+        return ResponseEntity.ok(userMapper.toDto(userService.changeRole(id, tenantId, role)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable UUID tenantId,
                                        @PathVariable UUID id) {
-        userService.delete(id);
+        userService.delete(id, tenantId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -15,8 +15,10 @@ import java.util.UUID;
 public class UserResponse {
 
     private UUID id;
+    private String name;
     private String email;
     private Role role;
     private UUID tenantId;
+    private String tenantName;
     private boolean active;
 }

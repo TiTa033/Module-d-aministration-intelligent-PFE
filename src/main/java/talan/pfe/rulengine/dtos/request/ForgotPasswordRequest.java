@@ -2,20 +2,17 @@ package talan.pfe.rulengine.dtos.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Data;
-import talan.pfe.rulengine.enums.Role;
+import lombok.NoArgsConstructor;
 
 @Data
-public class CreateUserRequest {
+@NoArgsConstructor
+@AllArgsConstructor
+public class ForgotPasswordRequest {
 
     @NotBlank
-    private String name;
-
     @Email
-    @NotBlank
     private String email;
-
-    @NotNull
-    private Role role;
 }
+
