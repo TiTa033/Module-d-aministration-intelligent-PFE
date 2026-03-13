@@ -4,8 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import talan.pfe.rulengine.dtos.request.*;
 import talan.pfe.rulengine.services.AuthService;
@@ -47,6 +46,40 @@ public class AuthController {
     public ResponseEntity<Void> logout(
             @Valid @RequestBody RefreshTokenRequest request) {
         authService.logout(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Send password reset email")
+    public ResponseEntity<Void> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request,
+            @RequestHeader(value = "X-Reset-Base-Url") String resetBaseUrl) {
+        authService.forgotPassword(request, resetBaseUrl);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/reset-password-link")
+    @Operation(summary = "Consume reset token and set cookie, then redirect to frontend page")
+    public ResponseEntity<Void> consumeResetLink(@RequestParam("token") String token) {
+        ResponseCookie cookie = ResponseCookie.from("reset_token", token)
+                .httpOnly(true)
+                .path("/")
+                .maxAge(3600)
+                .build();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.LOCATION, "http://localhost:4200/authentication/reset-password");
+        headers.add(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        return new ResponseEntity<>(headers, HttpStatus.SEE_OTHER);
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password with token from cookie")
+    public ResponseEntity<Void> resetPassword(
+            @CookieValue("reset_token") String token,
+            @Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(token, request);
         return ResponseEntity.noContent().build();
     }
 }
