@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import talan.pfe.rulengine.dtos.request.TenantResponse;
+import talan.pfe.rulengine.dtos.response.TenantResponse;
 import talan.pfe.rulengine.services.TenantService;
 
 import java.util.UUID;
