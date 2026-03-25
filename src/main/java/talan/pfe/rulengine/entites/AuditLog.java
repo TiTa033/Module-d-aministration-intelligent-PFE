@@ -7,7 +7,6 @@ import org.hibernate.type.SqlTypes;
 import talan.pfe.rulengine.enums.AuditAction;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(
@@ -27,9 +26,9 @@ import java.util.UUID;
 public class AuditLog {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "action", nullable = false)
@@ -39,7 +38,7 @@ public class AuditLog {
     private String entityType;
 
     @Column(name = "entity_id", nullable = false)
-    private UUID entityId;
+    private Long entityId;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "old_value", columnDefinition = "jsonb")

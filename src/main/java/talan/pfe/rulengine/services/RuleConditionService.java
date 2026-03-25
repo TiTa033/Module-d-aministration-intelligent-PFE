@@ -11,12 +11,12 @@ import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
+import talan.pfe.rulengine.mappers.RuleConditionMapper;
 import talan.pfe.rulengine.repositories.RuleConditionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -26,13 +26,14 @@ public class RuleConditionService {
     private final RuleSetRepository ruleSetRepository;
     private final RuleRepository ruleRepository;
     private final RuleConditionRepository ruleConditionRepository;
+    private final RuleConditionMapper ruleConditionMapper;
 
     @Transactional
-    public RuleConditionResponse create(UUID ruleSetId,
-                                        UUID ruleId,
-                                        UUID tenantId,
+    public RuleConditionResponse create(Long ruleSetId, Long ruleId,
+                                        Long tenantId,
                                         RuleConditionRequest request) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
+
         if (rule.getRuleSet().getStatus() == RuleSetStatus.ARCHIVED) {
             throw new BadRequestException(
                     "Cannot modify conditions of an archived RuleSet");
@@ -46,38 +47,33 @@ public class RuleConditionService {
                 .rule(rule)
                 .build();
 
-        return RuleConditionResponse.from(ruleConditionRepository.save(condition));
+        return ruleConditionMapper.toDto(
+                ruleConditionRepository.save(condition));
     }
 
-    public List<RuleConditionResponse> getAll(UUID ruleSetId,
-                                              UUID ruleId,
-                                              UUID tenantId) {
+    public List<RuleConditionResponse> getAll(Long ruleSetId, Long ruleId,
+                                              Long tenantId) {
         findRuleOrThrow(ruleSetId, ruleId, tenantId);
-        return ruleConditionRepository.findAllByRuleIdOrderByIdAsc(ruleId)
-                .stream()
-                .map(RuleConditionResponse::from)
-                .toList();
+        return ruleConditionMapper.toDtoList(
+                ruleConditionRepository.findAllByRuleIdOrderByIdAsc(ruleId));
     }
 
-    public RuleConditionResponse getById(UUID ruleSetId,
-                                         UUID ruleId,
-                                         UUID id,
-                                         UUID tenantId) {
+    public RuleConditionResponse getById(Long ruleSetId, Long ruleId,
+                                         Long id, Long tenantId) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
         RuleCondition condition = ruleConditionRepository.findById(id)
                 .filter(c -> c.getRule().getId().equals(rule.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleCondition not found with id: " + id));
-        return RuleConditionResponse.from(condition);
+        return ruleConditionMapper.toDto(condition);
     }
 
     @Transactional
-    public RuleConditionResponse update(UUID ruleSetId,
-                                        UUID ruleId,
-                                        UUID id,
-                                        UUID tenantId,
+    public RuleConditionResponse update(Long ruleSetId, Long ruleId,
+                                        Long id, Long tenantId,
                                         RuleConditionRequest request) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
+
         if (rule.getRuleSet().getStatus() == RuleSetStatus.ARCHIVED) {
             throw new BadRequestException(
                     "Cannot modify conditions of an archived RuleSet");
@@ -93,15 +89,15 @@ public class RuleConditionService {
         condition.setValue(request.getValue());
         condition.setValueType(request.getValueType());
 
-        return RuleConditionResponse.from(ruleConditionRepository.save(condition));
+        return ruleConditionMapper.toDto(
+                ruleConditionRepository.save(condition));
     }
 
     @Transactional
-    public void delete(UUID ruleSetId,
-                       UUID ruleId,
-                       UUID id,
-                       UUID tenantId) {
+    public void delete(Long ruleSetId, Long ruleId,
+                       Long id, Long tenantId) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
+
         if (rule.getRuleSet().getStatus() == RuleSetStatus.ARCHIVED) {
             throw new BadRequestException(
                     "Cannot delete conditions from an archived RuleSet");
@@ -115,10 +111,10 @@ public class RuleConditionService {
         ruleConditionRepository.delete(condition);
     }
 
-    private Rule findRuleOrThrow(UUID ruleSetId,
-                                 UUID ruleId,
-                                 UUID tenantId) {
-        RuleSet ruleSet = ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId)
+    private Rule findRuleOrThrow(Long ruleSetId, Long ruleId,
+                                 Long tenantId) {
+        RuleSet ruleSet = ruleSetRepository
+                .findByIdAndTenantId(ruleSetId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleSet not found with id: " + ruleSetId));
 
@@ -127,4 +123,3 @@ public class RuleConditionService {
                         "Rule not found with id: " + ruleId));
     }
 }
-

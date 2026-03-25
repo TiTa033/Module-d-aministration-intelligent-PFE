@@ -5,7 +5,6 @@ import lombok.*;
 import talan.pfe.rulengine.enums.TenantStatus;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "tenants")
@@ -17,9 +16,9 @@ import java.util.UUID;
 public class Tenant {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @Column(name = "name", nullable = false)
     private String name;

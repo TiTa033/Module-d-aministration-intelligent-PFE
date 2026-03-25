@@ -4,9 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import talan.pfe.rulengine.enums.DataType;
 import talan.pfe.rulengine.enums.Operator;
-
-import java.util.UUID;
-
 @Entity
 @Table(name = "rule_conditions")
 @Getter
@@ -17,9 +14,9 @@ import java.util.UUID;
 public class RuleCondition {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @Column(name = "field", nullable = false)
     private String field;

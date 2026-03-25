@@ -7,8 +7,6 @@ import talan.pfe.rulengine.enums.LogicOperator;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
-
 @Entity
 @Table(name = "rules")
 @Getter
@@ -19,9 +17,9 @@ import java.util.UUID;
 public class Rule {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @Column(name = "name", nullable = false)
     private String name;

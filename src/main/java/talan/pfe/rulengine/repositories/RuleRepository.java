@@ -10,30 +10,29 @@ import talan.pfe.rulengine.entites.Rule;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Repository
-public interface RuleRepository extends JpaRepository<Rule, UUID> {
+public interface RuleRepository extends JpaRepository<Rule, Long> {
 
-    List<Rule> findAllByRuleSetIdOrderByPriorityAsc(UUID ruleSetId);
+    List<Rule> findAllByRuleSetIdOrderByPriorityAsc(Long ruleSetId);
 
-    Optional<Rule> findByIdAndRuleSetId(UUID id, UUID ruleSetId);
+    Optional<Rule> findByIdAndRuleSetId(Long id, Long ruleSetId);
 
-    boolean existsByNameAndRuleSetId(String name, UUID ruleSetId);
+    boolean existsByNameAndRuleSetId(String name, Long ruleSetId);
 
-    boolean existsByNameAndRuleSetIdAndIdNot(String name, UUID ruleSetId, UUID id);
+    boolean existsByNameAndRuleSetIdAndIdNot(String name, Long ruleSetId, Long id);
 
-    boolean existsByPriorityAndRuleSetId(Integer priority, UUID ruleSetId);
+    boolean existsByPriorityAndRuleSetId(Integer priority, Long ruleSetId);
 
     boolean existsByPriorityAndRuleSetIdAndIdNot(
-            Integer priority, UUID ruleSetId, UUID id);
+            Integer priority, Long ruleSetId, Long id);
 
     @Query("SELECT r FROM Rule r WHERE r.ruleSet.id = :ruleSetId " +
             "AND (:search = '' OR LOWER(r.name) " +
             "LIKE LOWER(CONCAT('%', :search, '%')))" +
             "AND (:enabled IS NULL OR r.enabled = :enabled)")
     Page<Rule> findAllByRuleSetWithFilters(
-            @Param("ruleSetId") UUID ruleSetId,
+            @Param("ruleSetId") Long ruleSetId,
             @Param("search") String search,
             @Param("enabled") Boolean enabled,
             Pageable pageable

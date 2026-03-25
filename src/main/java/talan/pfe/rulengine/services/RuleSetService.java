@@ -12,10 +12,9 @@ import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 import talan.pfe.rulengine.exception.*;
+import talan.pfe.rulengine.mappers.RuleSetMapper;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.repositories.TenantRepository;
-
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,10 +23,11 @@ public class RuleSetService {
 
     private final RuleSetRepository ruleSetRepository;
     private final TenantRepository tenantRepository;
+    private final RuleSetMapper ruleSetMapper;
 
-    // ─── CREATE ─────────────────────────────────────────────
     @Transactional
-    public RuleSetResponse create(CreateRuleSetRequest request, UUID tenantId) {
+    public RuleSetResponse create(CreateRuleSetRequest request,
+                                  Long tenantId) {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Tenant not found with id: " + tenantId));
@@ -46,24 +46,16 @@ public class RuleSetService {
                 .tenant(tenant)
                 .build();
 
-        return RuleSetResponse.from(ruleSetRepository.save(ruleSet));
+        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
     }
 
-    // ─── GET BY ID ──────────────────────────────────────────
-    public RuleSetResponse getById(UUID id, UUID tenantId) {
-        RuleSet ruleSet = findOrThrow(id, tenantId);
-        return RuleSetResponse.from(ruleSet);
+    public RuleSetResponse getById(Long id, Long tenantId) {
+        return ruleSetMapper.toDto(findOrThrow(id, tenantId));
     }
 
-    // ─── GET ALL ────────────────────────────────────────────
     public PageResponse<RuleSetResponse> getAll(
-            UUID tenantId,
-            String search,
-            String status,
-            int page,
-            int size,
-            String sortBy,
-            String sortDir) {
+            Long tenantId, String search, String status,
+            int page, int size, String sortBy, String sortDir) {
 
         String searchParam = (search == null) ? "" : search;
 
@@ -86,18 +78,16 @@ public class RuleSetService {
         Page<RuleSetResponse> resultPage = ruleSetRepository
                 .findAllByTenantWithFilters(
                         tenantId, searchParam, ruleSetStatus, pageable)
-                .map(RuleSetResponse::from);
+                .map(ruleSetMapper::toDto);
 
         return PageResponse.from(resultPage);
     }
 
-    // ─── UPDATE ─────────────────────────────────────────────
     @Transactional
-    public RuleSetResponse update(UUID id, UUID tenantId,
+    public RuleSetResponse update(Long id, Long tenantId,
                                   UpdateRuleSetRequest request) {
         RuleSet ruleSet = findOrThrow(id, tenantId);
 
-        // Check name uniqueness excluding current
         if (ruleSetRepository.existsByNameAndTenantIdAndIdNot(
                 request.getName(), tenantId, id)) {
             throw new ConflictException(
@@ -105,7 +95,6 @@ public class RuleSetService {
                             "' already exists in this tenant");
         }
 
-        // Cannot update an ARCHIVED ruleset
         if (ruleSet.getStatus() == RuleSetStatus.ARCHIVED) {
             throw new BadRequestException(
                     "Cannot update an archived RuleSet");
@@ -115,21 +104,15 @@ public class RuleSetService {
         ruleSet.setDescription(request.getDescription());
         ruleSet.setEvaluationStrategy(request.getEvaluationStrategy());
 
-        return RuleSetResponse.from(ruleSetRepository.save(ruleSet));
+        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
     }
 
-    // ─── ACTIVATE ───────────────────────────────────────────
     @Transactional
-    public RuleSetResponse activate(UUID id, UUID tenantId) {
+    public RuleSetResponse activate(Long id, Long tenantId) {
         RuleSet ruleSet = findOrThrow(id, tenantId);
 
         if (ruleSet.getStatus() == RuleSetStatus.ACTIVE) {
             throw new BadRequestException("RuleSet is already active");
-        }
-
-        if (ruleSet.getStatus() == RuleSetStatus.ARCHIVED) {
-            throw new BadRequestException(
-                    "Cannot activate an archived RuleSet");
         }
 
         if (ruleSet.getRules().isEmpty()) {
@@ -138,12 +121,11 @@ public class RuleSetService {
         }
 
         ruleSet.setStatus(RuleSetStatus.ACTIVE);
-        return RuleSetResponse.from(ruleSetRepository.save(ruleSet));
+        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
     }
 
-    // ─── ARCHIVE ────────────────────────────────────────────
     @Transactional
-    public RuleSetResponse archive(UUID id, UUID tenantId) {
+    public RuleSetResponse archive(Long id, Long tenantId) {
         RuleSet ruleSet = findOrThrow(id, tenantId);
 
         if (ruleSet.getStatus() == RuleSetStatus.ARCHIVED) {
@@ -151,30 +133,23 @@ public class RuleSetService {
         }
 
         ruleSet.setStatus(RuleSetStatus.ARCHIVED);
-        return RuleSetResponse.from(ruleSetRepository.save(ruleSet));
+        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
     }
 
-    // ─── DRAFT ──────────────────────────────────────────────
     @Transactional
-    public RuleSetResponse moveToDraft(UUID id, UUID tenantId) {
+    public RuleSetResponse moveToDraft(Long id, Long tenantId) {
         RuleSet ruleSet = findOrThrow(id, tenantId);
 
         if (ruleSet.getStatus() == RuleSetStatus.DRAFT) {
             throw new BadRequestException("RuleSet is already in draft");
         }
 
-        if (ruleSet.getStatus() == RuleSetStatus.ARCHIVED) {
-            throw new BadRequestException(
-                    "Cannot move an archived RuleSet back to draft");
-        }
-
         ruleSet.setStatus(RuleSetStatus.DRAFT);
-        return RuleSetResponse.from(ruleSetRepository.save(ruleSet));
+        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
     }
 
-    // ─── DELETE ─────────────────────────────────────────────
     @Transactional
-    public void delete(UUID id, UUID tenantId) {
+    public void delete(Long id, Long tenantId) {
         RuleSet ruleSet = findOrThrow(id, tenantId);
 
         if (ruleSet.getStatus() == RuleSetStatus.ACTIVE) {
@@ -185,8 +160,7 @@ public class RuleSetService {
         ruleSetRepository.delete(ruleSet);
     }
 
-    // ─── PRIVATE HELPER ─────────────────────────────────────
-    private RuleSet findOrThrow(UUID id, UUID tenantId) {
+    private RuleSet findOrThrow(Long id, Long tenantId) {
         return ruleSetRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleSet not found with id: " + id));

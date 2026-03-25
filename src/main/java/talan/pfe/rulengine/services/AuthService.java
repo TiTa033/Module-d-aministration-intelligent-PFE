@@ -7,16 +7,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import talan.pfe.rulengine.dtos.request.*;
-
 import talan.pfe.rulengine.entites.PasswordResetToken;
 import talan.pfe.rulengine.entites.RefreshToken;
 import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.entites.User;
-
 import talan.pfe.rulengine.dtos.response.AuthResponse;
 import talan.pfe.rulengine.entites.*;
-
-import talan.pfe.rulengine.entites.User;
 import talan.pfe.rulengine.enums.Role;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
 import talan.pfe.rulengine.exception.TokenException;
@@ -25,8 +21,6 @@ import talan.pfe.rulengine.repositories.RefreshTokenRepository;
 import talan.pfe.rulengine.repositories.TenantRepository;
 import talan.pfe.rulengine.repositories.UserRepository;
 import talan.pfe.rulengine.security.*;
-
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -40,22 +34,17 @@ public class AuthService {
     private final CustomUserDetailsService userDetailsService;
     private final RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
-
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final MailService mailService;
-
     private final OtpService otpService;
     private final EmailService emailService;
     private final CaptchaService captchaService;
 
-
     // ─── LOGIN ──────────────────────────────────────────────
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        // 1. Verify captcha first
         captchaService.verify(request.getCaptchaToken());
 
-        // 2. Authenticate credentials
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getEmail(), request.getPassword()));
@@ -63,23 +52,20 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow();
 
-        // 3. Generate and send OTP
         String otp = otpService.generateAndStore(user.getEmail());
         emailService.sendOtpEmail(user.getEmail(), otp);
 
-        // 4. Return response telling frontend to show OTP page
         return AuthResponse.builder()
                 .email(user.getEmail())
                 .requiresOtp(true)
                 .build();
     }
 
+    // ─── VERIFY OTP ─────────────────────────────────────────
     @Transactional
     public AuthResponse verifyOtp(VerifyOtpRequest request) {
-        // 1. Verify OTP from Redis
         otpService.verify(request.getEmail(), request.getOtpCode());
 
-        // 2. Load user and issue tokens
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "User not found"));
@@ -90,26 +76,48 @@ public class AuthService {
     // ─── REGISTER ───────────────────────────────────────────
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        // Check if email already exists in this tenant
-        if (userRepository.existsByEmailAndTenantId(
-                request.getEmail(),
-                UUID.fromString(request.getTenantId()))) {
-            throw new IllegalArgumentException(
-                    "Email already exists in this tenant");
-        }
-
-        Tenant tenant = tenantRepository
-                .findById(UUID.fromString(request.getTenantId()))
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Tenant not found"));
 
         Role role = request.getRole() != null ? request.getRole() : Role.VIEWER;
+
+        Tenant tenant = null;
+
+        // ✅ NON GLOBAL USERS → tenant REQUIRED
+        if (role != Role.GLOBAL_ADMIN) {
+
+            if (request.getTenantId() == null || request.getTenantId().isBlank()) {
+                throw new IllegalArgumentException("Tenant ID is required for this role");
+            }
+
+            Long tenantId = Long.parseLong(request.getTenantId());
+
+            if (userRepository.existsByEmailAndTenantId(
+                    request.getEmail(), tenantId)) {
+                throw new IllegalArgumentException(
+                        "Email already exists in this tenant");
+            }
+
+            tenant = tenantRepository.findById(tenantId)
+                    .orElseThrow(() ->
+                            new IllegalArgumentException("Tenant not found"));
+        }
+
+        // ✅ GLOBAL ADMIN → NO tenant
+        else {
+            if (request.getTenantId() != null) {
+                throw new IllegalArgumentException("GLOBAL_ADMIN cannot have a tenant");
+            }
+
+            // Optional but recommended
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new IllegalArgumentException("Email already exists");
+            }
+        }
 
         User user = User.builder()
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(role)
-                .tenant(tenant)
+                .tenant(tenant) // null for GLOBAL_ADMIN
                 .build();
 
         userRepository.save(user);
@@ -120,7 +128,6 @@ public class AuthService {
     // ─── REFRESH ────────────────────────────────────────────
     @Transactional
     public AuthResponse refresh(RefreshTokenRequest request) {
-        // Verify old token and get a new rotated one
         RefreshToken newRefreshToken = refreshTokenService
                 .verifyAndRotate(request.getRefreshToken());
 
@@ -128,9 +135,14 @@ public class AuthService {
         UserDetails userDetails =
                 userDetailsService.loadUserByUsername(user.getEmail());
 
+        // ✅ Handle null tenant (GLOBAL_ADMIN case)
+        String tenantId = user.getTenant() != null
+                ? user.getTenant().getId().toString()
+                : null;
+
         String accessToken = jwtService.generateAccessToken(
                 userDetails,
-                user.getTenant().getId().toString(),
+                tenantId,
                 user.getRole().name()
         );
 
@@ -139,7 +151,7 @@ public class AuthService {
                 .refreshToken(newRefreshToken.getToken())
                 .email(user.getEmail())
                 .role(user.getRole().name())
-                .tenantId(user.getTenant().getId().toString())
+                .tenantId(tenantId)
                 .accessTokenExpiresIn(900000L)
                 .refreshTokenExpiresIn(604800000L)
                 .build();
@@ -156,11 +168,13 @@ public class AuthService {
         refreshTokenRepository.revokeAllUserTokens(refreshToken.getUser());
     }
 
+    // ─── FORGOT PASSWORD ────────────────────────────────────
     @Transactional
-    public void forgotPassword(ForgotPasswordRequest request, String resetBaseUrl) {
+    public void forgotPassword(ForgotPasswordRequest request,
+                               String resetBaseUrl) {
         userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
             PasswordResetToken token = PasswordResetToken.builder()
-                    .token(UUID.randomUUID().toString())
+                    .token(java.util.UUID.randomUUID().toString())
                     .user(user)
                     .expiresAt(java.time.LocalDateTime.now().plusHours(1))
                     .used(false)
@@ -169,25 +183,44 @@ public class AuthService {
 
             String resetLink = resetBaseUrl + "?token=" + token.getToken();
             String subject = "Réinitialisation de votre mot de passe";
-            String text = "Bonjour,\n\nPour réinitialiser votre mot de passe, cliquez sur le lien suivant :\n"
-                    + resetLink + "\n\nCe lien est valable 1 heure.\n\nCordialement,\nRaaS Platform";
+            String text = "Bonjour,\n\nPour réinitialiser votre mot de passe, "
+                    + "cliquez sur le lien suivant :\n"
+                    + resetLink
+                    + "\n\nCe lien est valable 1 heure.\n\nCordialement,\nRaaS Platform";
 
             mailService.send(user.getEmail(), subject, text);
         });
     }
 
+    // ─── RESET PASSWORD ─────────────────────────────────────
     @Transactional
-    public void resetPassword(String tokenValue, ResetPasswordRequest request) {
-        PasswordResetToken token = passwordResetTokenRepository.findByToken(tokenValue)
-                .orElseThrow(() -> new IllegalArgumentException("Token invalide"));
+    public void resetPassword(String tokenValue,
+                              ResetPasswordRequest request) {
+        PasswordResetToken token = passwordResetTokenRepository
+                .findByToken(tokenValue)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Token invalide"));
 
-        if (token.isUsed() || token.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
-            throw new IllegalArgumentException("Token expiré ou déjà utilisé");
+        if (token.isUsed() ||
+                token.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
+            throw new IllegalArgumentException(
+                    "Token expiré ou déjà utilisé");
         }
 
         User user = token.getUser();
-        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordHash(
+                passwordEncoder.encode(request.getNewPassword()));
         token.setUsed(true);
+    }
+
+    // ─── RESEND OTP ─────────────────────────────────────────
+    @Transactional
+    public void resendOtp(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found"));
+        String otp = otpService.generateAndStore(user.getEmail());
+        emailService.sendOtpEmail(user.getEmail(), otp);
     }
 
     // ─── PRIVATE HELPER ─────────────────────────────────────
@@ -195,9 +228,14 @@ public class AuthService {
         UserDetails userDetails =
                 userDetailsService.loadUserByUsername(user.getEmail());
 
+        // tenantId is null for GLOBAL_ADMIN
+        String tenantId = user.getTenant() != null
+                ? user.getTenant().getId().toString()
+                : null;
+
         String accessToken = jwtService.generateAccessToken(
                 userDetails,
-                user.getTenant().getId().toString(),
+                tenantId,
                 user.getRole().name()
         );
 
@@ -209,17 +247,9 @@ public class AuthService {
                 .refreshToken(refreshToken.getToken())
                 .email(user.getEmail())
                 .role(user.getRole().name())
-                .tenantId(user.getTenant().getId().toString())
+                .tenantId(tenantId)
                 .accessTokenExpiresIn(900000L)
                 .refreshTokenExpiresIn(604800000L)
                 .build();
-    }
-    @Transactional
-    public void resendOtp(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "User not found"));
-        String otp = otpService.generateAndStore(user.getEmail());
-        emailService.sendOtpEmail(user.getEmail(), otp);
     }
 }

@@ -11,11 +11,11 @@ import talan.pfe.rulengine.entites.Rule;
 import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 import talan.pfe.rulengine.exception.*;
+import talan.pfe.rulengine.mappers.RuleMapper;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,20 +24,18 @@ public class RuleService {
 
     private final RuleRepository ruleRepository;
     private final RuleSetRepository ruleSetRepository;
+    private final RuleMapper ruleMapper;
 
-    // ─── CREATE ─────────────────────────────────────────────
     @Transactional
-    public RuleResponse create(UUID ruleSetId, UUID tenantId,
+    public RuleResponse create(Long ruleSetId, Long tenantId,
                                CreateRuleRequest request) {
         RuleSet ruleSet = findRuleSetOrThrow(ruleSetId, tenantId);
 
-        // Cannot add rules to an ARCHIVED ruleset
         if (ruleSet.getStatus() == RuleSetStatus.ARCHIVED) {
             throw new BadRequestException(
                     "Cannot add rules to an archived RuleSet");
         }
 
-        // Check name uniqueness within ruleset
         if (ruleRepository.existsByNameAndRuleSetId(
                 request.getName(), ruleSetId)) {
             throw new ConflictException(
@@ -45,7 +43,6 @@ public class RuleService {
                             "' already exists in this RuleSet");
         }
 
-        // Check priority uniqueness within ruleset
         if (ruleRepository.existsByPriorityAndRuleSetId(
                 request.getPriority(), ruleSetId)) {
             throw new ConflictException(
@@ -62,16 +59,16 @@ public class RuleService {
                 .ruleSet(ruleSet)
                 .build();
 
-        return RuleResponse.from(ruleRepository.save(rule));
+        return ruleMapper.toDto(ruleRepository.save(rule));
     }
 
-    // ─── GET ALL ────────────────────────────────────────────
     public PageResponse<RuleResponse> getAll(
-            UUID ruleSetId, UUID tenantId, RuleFilterRequest filter) {
+            Long ruleSetId, Long tenantId, RuleFilterRequest filter) {
 
         findRuleSetOrThrow(ruleSetId, tenantId);
 
-        String searchParam = (filter.getSearch() == null) ? "" : filter.getSearch();
+        String searchParam = (filter.getSearch() == null)
+                ? "" : filter.getSearch();
 
         Boolean enabledParam = null;
         if (filter.getEnabled() != null && !filter.getEnabled().isBlank()) {
@@ -82,36 +79,31 @@ public class RuleService {
                 ? Sort.by(filter.getSortBy()).descending()
                 : Sort.by(filter.getSortBy()).ascending();
 
-        Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
+        Pageable pageable = PageRequest.of(
+                filter.getPage(), filter.getSize(), sort);
 
         Page<RuleResponse> resultPage = ruleRepository
                 .findAllByRuleSetWithFilters(
                         ruleSetId, searchParam, enabledParam, pageable)
-                .map(RuleResponse::from);
+                .map(ruleMapper::toDto);
 
         return PageResponse.from(resultPage);
     }
 
-    // ─── GET ALL LIST (no pagination — for evaluation engine) ──
-    public List<RuleResponse> getAllList(UUID ruleSetId, UUID tenantId) {
+    public List<RuleResponse> getAllList(Long ruleSetId, Long tenantId) {
         findRuleSetOrThrow(ruleSetId, tenantId);
-        return ruleRepository
-                .findAllByRuleSetIdOrderByPriorityAsc(ruleSetId)
-                .stream()
-                .map(RuleResponse::from)
-                .toList();
+        return ruleMapper.toDtoList(
+                ruleRepository.findAllByRuleSetIdOrderByPriorityAsc(ruleSetId));
     }
 
-    // ─── GET BY ID ──────────────────────────────────────────
-    public RuleResponse getById(UUID ruleSetId, UUID id, UUID tenantId) {
+    public RuleResponse getById(Long ruleSetId, Long id, Long tenantId) {
         findRuleSetOrThrow(ruleSetId, tenantId);
-        return RuleResponse.from(findRuleOrThrow(id, ruleSetId));
+        return ruleMapper.toDto(findRuleOrThrow(id, ruleSetId));
     }
 
-    // ─── UPDATE ─────────────────────────────────────────────
     @Transactional
-    public RuleResponse update(UUID ruleSetId, UUID id,
-                               UUID tenantId, UpdateRuleRequest request) {
+    public RuleResponse update(Long ruleSetId, Long id,
+                               Long tenantId, UpdateRuleRequest request) {
         RuleSet ruleSet = findRuleSetOrThrow(ruleSetId, tenantId);
 
         if (ruleSet.getStatus() == RuleSetStatus.ARCHIVED) {
@@ -121,7 +113,6 @@ public class RuleService {
 
         Rule rule = findRuleOrThrow(id, ruleSetId);
 
-        // Check name uniqueness excluding current
         if (ruleRepository.existsByNameAndRuleSetIdAndIdNot(
                 request.getName(), ruleSetId, id)) {
             throw new ConflictException(
@@ -129,7 +120,6 @@ public class RuleService {
                             "' already exists in this RuleSet");
         }
 
-        // Check priority uniqueness excluding current
         if (ruleRepository.existsByPriorityAndRuleSetIdAndIdNot(
                 request.getPriority(), ruleSetId, id)) {
             throw new ConflictException(
@@ -143,12 +133,11 @@ public class RuleService {
         rule.setLogicOperator(request.getLogicOperator());
         rule.setScore(request.getScore());
 
-        return RuleResponse.from(ruleRepository.save(rule));
+        return ruleMapper.toDto(ruleRepository.save(rule));
     }
 
-    // ─── ENABLE ─────────────────────────────────────────────
     @Transactional
-    public RuleResponse enable(UUID ruleSetId, UUID id, UUID tenantId) {
+    public RuleResponse enable(Long ruleSetId, Long id, Long tenantId) {
         findRuleSetOrThrow(ruleSetId, tenantId);
         Rule rule = findRuleOrThrow(id, ruleSetId);
 
@@ -157,12 +146,11 @@ public class RuleService {
         }
 
         rule.setEnabled(true);
-        return RuleResponse.from(ruleRepository.save(rule));
+        return ruleMapper.toDto(ruleRepository.save(rule));
     }
 
-    // ─── DISABLE ────────────────────────────────────────────
     @Transactional
-    public RuleResponse disable(UUID ruleSetId, UUID id, UUID tenantId) {
+    public RuleResponse disable(Long ruleSetId, Long id, Long tenantId) {
         findRuleSetOrThrow(ruleSetId, tenantId);
         Rule rule = findRuleOrThrow(id, ruleSetId);
 
@@ -171,12 +159,11 @@ public class RuleService {
         }
 
         rule.setEnabled(false);
-        return RuleResponse.from(ruleRepository.save(rule));
+        return ruleMapper.toDto(ruleRepository.save(rule));
     }
 
-    // ─── DELETE ─────────────────────────────────────────────
     @Transactional
-    public void delete(UUID ruleSetId, UUID id, UUID tenantId) {
+    public void delete(Long ruleSetId, Long id, Long tenantId) {
         RuleSet ruleSet = findRuleSetOrThrow(ruleSetId, tenantId);
 
         if (ruleSet.getStatus() == RuleSetStatus.ARCHIVED) {
@@ -184,18 +171,16 @@ public class RuleService {
                     "Cannot delete rules from an archived RuleSet");
         }
 
-        Rule rule = findRuleOrThrow(id, ruleSetId);
-        ruleRepository.delete(rule);
+        ruleRepository.delete(findRuleOrThrow(id, ruleSetId));
     }
 
-    // ─── PRIVATE HELPERS ────────────────────────────────────
-    private RuleSet findRuleSetOrThrow(UUID ruleSetId, UUID tenantId) {
+    private RuleSet findRuleSetOrThrow(Long ruleSetId, Long tenantId) {
         return ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleSet not found with id: " + ruleSetId));
     }
 
-    private Rule findRuleOrThrow(UUID id, UUID ruleSetId) {
+    private Rule findRuleOrThrow(Long id, Long ruleSetId) {
         return ruleRepository.findByIdAndRuleSetId(id, ruleSetId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Rule not found with id: " + id));

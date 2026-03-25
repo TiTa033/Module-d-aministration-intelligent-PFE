@@ -14,7 +14,6 @@ import talan.pfe.rulengine.security.JwtService;
 import talan.pfe.rulengine.services.RuleActionService;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/rulesets/{ruleSetId}/rules/{ruleId}/actions")
@@ -26,17 +25,20 @@ public class RuleActionController {
     private final RuleActionService actionService;
     private final JwtService jwtService;
 
-    private UUID getTenantId(String authHeader) {
-        return UUID.fromString(
-                jwtService.extractTenantId(authHeader.substring(7)));
+    private Long getTenantId(String authHeader) {
+        String tenantId = jwtService.extractTenantId(
+                authHeader.substring(7));
+        return (tenantId != null && !tenantId.equals("null"))
+                ? Long.parseLong(tenantId)
+                : null;
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER')")
     @Operation(summary = "Create a new RuleAction")
     public ResponseEntity<RuleActionResponse> create(
-            @PathVariable UUID ruleSetId,
-            @PathVariable UUID ruleId,
+            @PathVariable Long ruleSetId,
+            @PathVariable Long ruleId,
             @Valid @RequestBody RuleActionRequest request,
             @RequestHeader("Authorization") String authHeader) {
 
@@ -49,8 +51,8 @@ public class RuleActionController {
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER', 'VIEWER')")
     @Operation(summary = "Get all RuleActions for a Rule")
     public ResponseEntity<List<RuleActionResponse>> getAll(
-            @PathVariable UUID ruleSetId,
-            @PathVariable UUID ruleId,
+            @PathVariable Long ruleSetId,
+            @PathVariable Long ruleId,
             @RequestHeader("Authorization") String authHeader) {
 
         return ResponseEntity.ok(
@@ -61,9 +63,9 @@ public class RuleActionController {
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER', 'VIEWER')")
     @Operation(summary = "Get RuleAction by ID")
     public ResponseEntity<RuleActionResponse> getById(
-            @PathVariable UUID ruleSetId,
-            @PathVariable UUID ruleId,
-            @PathVariable UUID id,
+            @PathVariable Long ruleSetId,
+            @PathVariable Long ruleId,
+            @PathVariable Long id,
             @RequestHeader("Authorization") String authHeader) {
 
         return ResponseEntity.ok(
@@ -74,9 +76,9 @@ public class RuleActionController {
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER')")
     @Operation(summary = "Update a RuleAction")
     public ResponseEntity<RuleActionResponse> update(
-            @PathVariable UUID ruleSetId,
-            @PathVariable UUID ruleId,
-            @PathVariable UUID id,
+            @PathVariable Long ruleSetId,
+            @PathVariable Long ruleId,
+            @PathVariable Long id,
             @Valid @RequestBody RuleActionRequest request,
             @RequestHeader("Authorization") String authHeader) {
 
@@ -89,13 +91,12 @@ public class RuleActionController {
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER')")
     @Operation(summary = "Delete a RuleAction")
     public ResponseEntity<Void> delete(
-            @PathVariable UUID ruleSetId,
-            @PathVariable UUID ruleId,
-            @PathVariable UUID id,
+            @PathVariable Long ruleSetId,
+            @PathVariable Long ruleId,
+            @PathVariable Long id,
             @RequestHeader("Authorization") String authHeader) {
 
         actionService.delete(ruleSetId, ruleId, id, getTenantId(authHeader));
         return ResponseEntity.noContent().build();
     }
 }
-

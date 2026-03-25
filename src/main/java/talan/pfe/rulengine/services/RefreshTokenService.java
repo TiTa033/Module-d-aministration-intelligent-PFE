@@ -59,7 +59,7 @@ public class RefreshTokenService {
         refreshToken.revoke();
         refreshTokenRepository.save(refreshToken);
 
-        // Issue a brand new refresh token
+        // Issue a  new refresh token
         return createRefreshToken(refreshToken.getUser());
     }
 }

@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface RuleActionRepository extends JpaRepository<RuleAction, UUID> {
+public interface RuleActionRepository extends JpaRepository<RuleAction, Long> {
 
-    List<RuleAction> findAllByRuleIdOrderByIdAsc(UUID ruleId);
+    List<RuleAction> findAllByRuleIdOrderByIdAsc(Long ruleId);
 }
 

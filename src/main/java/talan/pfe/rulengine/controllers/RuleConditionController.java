@@ -14,7 +14,6 @@ import talan.pfe.rulengine.security.JwtService;
 import talan.pfe.rulengine.services.RuleConditionService;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/rulesets/{ruleSetId}/rules/{ruleId}/conditions")
@@ -26,17 +25,20 @@ public class RuleConditionController {
     private final RuleConditionService conditionService;
     private final JwtService jwtService;
 
-    private UUID getTenantId(String authHeader) {
-        return UUID.fromString(
-                jwtService.extractTenantId(authHeader.substring(7)));
+    private Long getTenantId(String authHeader) {
+        String tenantId = jwtService.extractTenantId(
+                authHeader.substring(7));
+        return (tenantId != null && !tenantId.equals("null"))
+                ? Long.parseLong(tenantId)
+                : null;
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER')")
     @Operation(summary = "Create a new RuleCondition")
     public ResponseEntity<RuleConditionResponse> create(
-            @PathVariable UUID ruleSetId,
-            @PathVariable UUID ruleId,
+            @PathVariable Long ruleSetId,
+            @PathVariable Long ruleId,
             @Valid @RequestBody RuleConditionRequest request,
             @RequestHeader("Authorization") String authHeader) {
 
@@ -49,34 +51,36 @@ public class RuleConditionController {
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER', 'VIEWER')")
     @Operation(summary = "Get all RuleConditions for a Rule")
     public ResponseEntity<List<RuleConditionResponse>> getAll(
-            @PathVariable UUID ruleSetId,
-            @PathVariable UUID ruleId,
+            @PathVariable Long ruleSetId,
+            @PathVariable Long ruleId,
             @RequestHeader("Authorization") String authHeader) {
 
         return ResponseEntity.ok(
-                conditionService.getAll(ruleSetId, ruleId, getTenantId(authHeader)));
+                conditionService.getAll(
+                        ruleSetId, ruleId, getTenantId(authHeader)));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER', 'VIEWER')")
     @Operation(summary = "Get RuleCondition by ID")
     public ResponseEntity<RuleConditionResponse> getById(
-            @PathVariable UUID ruleSetId,
-            @PathVariable UUID ruleId,
-            @PathVariable UUID id,
+            @PathVariable Long ruleSetId,
+            @PathVariable Long ruleId,
+            @PathVariable Long id,
             @RequestHeader("Authorization") String authHeader) {
 
         return ResponseEntity.ok(
-                conditionService.getById(ruleSetId, ruleId, id, getTenantId(authHeader)));
+                conditionService.getById(
+                        ruleSetId, ruleId, id, getTenantId(authHeader)));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER')")
     @Operation(summary = "Update a RuleCondition")
     public ResponseEntity<RuleConditionResponse> update(
-            @PathVariable UUID ruleSetId,
-            @PathVariable UUID ruleId,
-            @PathVariable UUID id,
+            @PathVariable Long ruleSetId,
+            @PathVariable Long ruleId,
+            @PathVariable Long id,
             @Valid @RequestBody RuleConditionRequest request,
             @RequestHeader("Authorization") String authHeader) {
 
@@ -89,13 +93,12 @@ public class RuleConditionController {
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER')")
     @Operation(summary = "Delete a RuleCondition")
     public ResponseEntity<Void> delete(
-            @PathVariable UUID ruleSetId,
-            @PathVariable UUID ruleId,
-            @PathVariable UUID id,
+            @PathVariable Long ruleSetId,
+            @PathVariable Long ruleId,
+            @PathVariable Long id,
             @RequestHeader("Authorization") String authHeader) {
 
         conditionService.delete(ruleSetId, ruleId, id, getTenantId(authHeader));
         return ResponseEntity.noContent().build();
     }
 }
-

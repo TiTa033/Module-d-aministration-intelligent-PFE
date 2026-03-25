@@ -1,32 +1,18 @@
 package talan.pfe.rulengine.mappers;
 
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import talan.pfe.rulengine.dtos.response.UserResponse;
 import talan.pfe.rulengine.entites.User;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
-@Component
-public class UserMapper {
+@Mapper(componentModel = "spring")
+public interface UserMapper {
 
-    public UserResponse toDto(User user) {
-        if (user == null) return null;
-        return UserResponse.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .role(user.getRole())
-                .tenantId(user.getTenant() != null ? user.getTenant().getId() : null)
-                .tenantName(user.getTenant() != null ? user.getTenant().getName() : null)
-                .active(user.isActive())
-                .build();
-    }
+    @Mapping(source = "tenant.id",   target = "tenantId")
+    @Mapping(source = "tenant.name", target = "tenantName")
+    UserResponse toDto(User user);
 
-    public List<UserResponse> toDtoList(List<User> users) {
-        if (users == null) return List.of();
-        return users.stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
-    }
+    List<UserResponse> toDtoList(List<User> users);
 }

@@ -39,7 +39,7 @@ class UserServiceTest {
     @InjectMocks
     private UserService userService;
 
-    private UUID tenantId;
+    private Long tenantId;
     private Tenant tenant;
     private CreateUserRequest createRequest;
 
