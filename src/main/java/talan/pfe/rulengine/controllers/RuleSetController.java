@@ -107,7 +107,7 @@ public class RuleSetController {
 
     // ─── MOVE TO DRAFT ──────────────────────────────────────
     @PatchMapping("/{id}/draft")
-    @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN')")
     @Operation(summary = "Move RuleSet back to Draft")
     public ResponseEntity<RuleSetResponse> moveToDraft(
             @PathVariable UUID id,
