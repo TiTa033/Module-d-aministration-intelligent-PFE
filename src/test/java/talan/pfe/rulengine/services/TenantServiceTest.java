@@ -16,6 +16,7 @@ import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ConflictException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
 import talan.pfe.rulengine.repositories.TenantRepository;
+import talan.pfe.rulengine.services.serviceImpl.TenantServiceImpl;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,13 +33,13 @@ class TenantServiceTest {
     @Mock
     private TenantRepository tenantRepository;
 
-    @InjectMocks
-    private TenantService tenantService;
+    private TenantServiceImpl tenantService;
 
     private Tenant mockTenant;
 
     @BeforeEach
     void setUp() {
+        tenantService = new TenantServiceImpl(tenantRepository);
         mockTenant = new Tenant();
         mockTenant.setId(UUID.randomUUID());
         mockTenant.setName("BNP Paribas");

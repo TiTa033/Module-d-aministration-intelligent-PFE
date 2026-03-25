@@ -13,8 +13,10 @@ import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.entites.User;
 import talan.pfe.rulengine.enums.Role;
 import talan.pfe.rulengine.enums.TenantStatus;
+import talan.pfe.rulengine.repositories.RefreshTokenRepository;
 import talan.pfe.rulengine.repositories.TenantRepository;
 import talan.pfe.rulengine.repositories.UserRepository;
+import talan.pfe.rulengine.services.serviceImpl.UserServiceImpl;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -36,8 +38,11 @@ class UserServiceTest {
     @Mock
     private TenantRepository tenantRepository;
 
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+
     @InjectMocks
-    private UserService userService;
+    private UserServiceImpl userService;
 
     private UUID tenantId;
     private Tenant tenant;
@@ -233,6 +238,7 @@ class UserServiceTest {
 
             userService.delete(userId, tenantId);
 
+            verify(refreshTokenRepository).deleteByUser(user);
             verify(userRepository).delete(user);
         }
     }

@@ -14,6 +14,7 @@ import talan.pfe.rulengine.enums.Role;
 import talan.pfe.rulengine.enums.TenantStatus;
 import talan.pfe.rulengine.exception.TokenException;
 import talan.pfe.rulengine.repositories.RefreshTokenRepository;
+import talan.pfe.rulengine.services.serviceImpl.RefreshTokenServiceImpl;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -29,8 +30,7 @@ class RefreshTokenServiceTest {
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
-    @InjectMocks
-    private RefreshTokenService refreshTokenService;
+    private RefreshTokenServiceImpl refreshTokenService;
 
     private User mockUser;
     private RefreshToken validToken;
@@ -39,6 +39,7 @@ class RefreshTokenServiceTest {
 
     @BeforeEach
     void setUp() {
+        refreshTokenService = new RefreshTokenServiceImpl(refreshTokenRepository);
         // Inject the @Value field manually since we're not loading Spring context
         ReflectionTestUtils.setField(
                 refreshTokenService,
