@@ -22,4 +22,7 @@ public interface RefreshTokenRepository
             "r.revokedAt = CURRENT_TIMESTAMP " +
             "WHERE r.user = :user AND r.revoked = false")
     void revokeAllUserTokens(User user);
+
+    @Modifying
+    void deleteByUser(User user);
 }

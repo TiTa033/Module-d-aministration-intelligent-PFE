@@ -24,6 +24,12 @@ import talan.pfe.rulengine.repositories.RefreshTokenRepository;
 import talan.pfe.rulengine.repositories.UserRepository;
 import talan.pfe.rulengine.security.CustomUserDetailsService;
 import talan.pfe.rulengine.security.JwtService;
+import talan.pfe.rulengine.services.serviceImpl.AuthServiceImpl;
+import talan.pfe.rulengine.services.serviceImpl.CaptchaServiceImpl;
+import talan.pfe.rulengine.services.serviceImpl.EmailServiceImpl;
+import talan.pfe.rulengine.services.serviceImpl.MailServiceImpl;
+import talan.pfe.rulengine.services.serviceImpl.OtpServiceImpl;
+import talan.pfe.rulengine.services.serviceImpl.RefreshTokenServiceImpl;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,11 +48,16 @@ class AuthServiceTest {
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private JwtService jwtService;
     @Mock private CustomUserDetailsService userDetailsService;
-    @Mock private RefreshTokenService refreshTokenService;
+    @Mock private RefreshTokenServiceImpl refreshTokenService;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private OtpServiceImpl otpService;
+    @Mock private EmailServiceImpl emailService;
+    @Mock private CaptchaServiceImpl captchaService;
+    @Mock private MailServiceImpl mailService;
+    @Mock private talan.pfe.rulengine.repositories.PasswordResetTokenRepository passwordResetTokenRepository;
+    @Mock private talan.pfe.rulengine.repositories.TenantRepository tenantRepository;
 
-    @InjectMocks
-    private AuthService authService;
+    private AuthServiceImpl authService;
 
     private User mockUser;
     private Tenant mockTenant;
@@ -55,6 +66,21 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
+        authService = new AuthServiceImpl(
+                authenticationManager,
+                userRepository,
+                tenantRepository,
+                refreshTokenRepository,
+                jwtService,
+                userDetailsService,
+                refreshTokenService,
+                passwordEncoder,
+                passwordResetTokenRepository,
+                mailService,
+                otpService,
+                emailService,
+                captchaService
+        );
         mockTenant = new Tenant();
         mockTenant.setId(UUID.randomUUID());
         mockTenant.setName("BNP Paribas");
@@ -98,26 +124,24 @@ class AuthServiceTest {
                         "amine@bnp.com", "password123"));
         when(userRepository.findByEmail("amine@bnp.com"))
                 .thenReturn(Optional.of(mockUser));
-        when(userDetailsService.loadUserByUsername("amine@bnp.com"))
-                .thenReturn(mockUserDetails);
-        when(jwtService.generateAccessToken(any(), any(), any()))
-                .thenReturn("mock.access.token");
-        when(refreshTokenService.createRefreshToken(any()))
-                .thenReturn(mockRefreshToken);
+        doNothing().when(captchaService).verify(any());
+        when(otpService.generateAndStore("amine@bnp.com")).thenReturn("123456");
+        doNothing().when(emailService).sendOtpEmail("amine@bnp.com", "123456");
 
         // Act
         AuthResponse response = authService.login(request);
 
         // Assert
         assertNotNull(response);
-        assertEquals("mock.access.token", response.getAccessToken());
-        assertEquals(mockRefreshToken.getToken(), response.getRefreshToken());
+        assertTrue(response.isRequiresOtp());
+        assertNull(response.getAccessToken());
+        assertNull(response.getRefreshToken());
         assertEquals("amine@bnp.com", response.getEmail());
-        assertEquals("ADMIN", response.getRole());
 
         verify(authenticationManager, times(1)).authenticate(any());
         verify(userRepository, times(1)).findByEmail("amine@bnp.com");
-        verify(refreshTokenService, times(1)).createRefreshToken(mockUser);
+        verify(otpService, times(1)).generateAndStore("amine@bnp.com");
+        verify(emailService, times(1)).sendOtpEmail("amine@bnp.com", "123456");
     }
 
     @Test
@@ -147,18 +171,16 @@ class AuthServiceTest {
         when(authenticationManager.authenticate(any())).thenReturn(null);
         when(userRepository.findByEmail("amine@bnp.com"))
                 .thenReturn(Optional.of(mockUser));
-        when(userDetailsService.loadUserByUsername(any()))
-                .thenReturn(mockUserDetails);
-        when(jwtService.generateAccessToken(any(), any(), any()))
-                .thenReturn("mock.access.token");
-        when(refreshTokenService.createRefreshToken(any()))
-                .thenReturn(mockRefreshToken);
+        doNothing().when(captchaService).verify(any());
+        when(otpService.generateAndStore("amine@bnp.com")).thenReturn("123456");
+        doNothing().when(emailService).sendOtpEmail("amine@bnp.com", "123456");
 
         // Act
         AuthResponse response = authService.login(request);
 
         // Assert
-        assertEquals(mockTenant.getId().toString(), response.getTenantId());
+        assertEquals("amine@bnp.com", response.getEmail());
+        assertTrue(response.isRequiresOtp());
     }
 
     // ─── REFRESH TESTS ──────────────────────────────────────

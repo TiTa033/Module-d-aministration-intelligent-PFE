@@ -1,0 +1,8 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-baseline.yaml
+  - include:
+      file: db/changelog/changes/002-add-user-phone.yaml
+
+  - include:
+      file: db/changelog/changes/003-drop-user-phone.yaml

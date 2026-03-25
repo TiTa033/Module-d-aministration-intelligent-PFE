@@ -21,6 +21,7 @@ import talan.pfe.rulengine.exception.ResourceNotFoundException;
 import talan.pfe.rulengine.repositories.RuleActionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
+import talan.pfe.rulengine.services.serviceImpl.RuleActionServiceImpl;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,7 +46,7 @@ class RuleActionServiceTest {
     private RuleActionRepository ruleActionRepository;
 
     @InjectMocks
-    private RuleActionService ruleActionService;
+    private RuleActionServiceImpl ruleActionService;
 
     private UUID tenantId;
     private UUID ruleSetId;
