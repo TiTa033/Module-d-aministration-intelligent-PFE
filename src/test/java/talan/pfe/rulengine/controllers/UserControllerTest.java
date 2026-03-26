@@ -13,7 +13,7 @@ import talan.pfe.rulengine.dtos.response.UserResponse;
 import talan.pfe.rulengine.entites.User;
 import talan.pfe.rulengine.enums.Role;
 import talan.pfe.rulengine.mappers.UserMapper;
-import talan.pfe.rulengine.services.UserService;
+import talan.pfe.rulengine.services.serviceImpl.UserServiceImpl;
 
 import java.util.List;
 import java.util.UUID;
@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 class UserControllerTest {
 
     @Mock
-    private UserService userService;
+    private UserServiceImpl userServiceImpl;
 
     @Mock
     private UserMapper userMapper;
@@ -62,14 +62,14 @@ class UserControllerTest {
                 .active(true)
                 .build();
 
-        when(userService.create(any(CreateUserRequest.class), any(UUID.class))).thenReturn(user);
+        when(userServiceImpl.create(any(CreateUserRequest.class), any(UUID.class))).thenReturn(user);
         when(userMapper.toDto(user)).thenReturn(dto);
 
         ResponseEntity<UserResponse> response = userController.create(tenantId, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isEqualTo(dto);
-        verify(userService).create(request, tenantId);
+        verify(userServiceImpl).create(request, tenantId);
         verify(userMapper).toDto(user);
     }
 
@@ -91,14 +91,14 @@ class UserControllerTest {
                 .active(true)
                 .build();
 
-        when(userService.getByTenant(tenantId)).thenReturn(List.of(user));
+        when(userServiceImpl.getByTenant(tenantId)).thenReturn(List.of(user));
         when(userMapper.toDtoList(List.of(user))).thenReturn(List.of(dto));
 
         ResponseEntity<List<UserResponse>> response = userController.getAll(tenantId);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsExactly(dto);
-        verify(userService).getByTenant(tenantId);
+        verify(userServiceImpl).getByTenant(tenantId);
         verify(userMapper).toDtoList(List.of(user));
     }
 
@@ -121,14 +121,14 @@ class UserControllerTest {
                 .active(true)
                 .build();
 
-        when(userService.getById(userId, tenantId)).thenReturn(user);
+        when(userServiceImpl.getById(userId, tenantId)).thenReturn(user);
         when(userMapper.toDto(user)).thenReturn(dto);
 
         ResponseEntity<UserResponse> response = userController.getById(tenantId, userId);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(dto);
-        verify(userService).getById(userId, tenantId);
+        verify(userServiceImpl).getById(userId, tenantId);
     }
 
     @Test
@@ -151,7 +151,7 @@ class UserControllerTest {
                 .active(true)
                 .build();
 
-        when(userService.setActive(userId, tenantId, true)).thenReturn(user);
+        when(userServiceImpl.setActive(userId, tenantId, true)).thenReturn(user);
         when(userMapper.toDto(user)).thenReturn(dto);
 
         ResponseEntity<UserResponse> response = userController.activate(tenantId, userId);
@@ -159,7 +159,7 @@ class UserControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().isActive()).isTrue();
-        verify(userService).setActive(userId, tenantId, true);
+        verify(userServiceImpl).setActive(userId, tenantId, true);
     }
 
     @Test
@@ -182,7 +182,7 @@ class UserControllerTest {
                 .active(false)
                 .build();
 
-        when(userService.setActive(userId, tenantId, false)).thenReturn(user);
+        when(userServiceImpl.setActive(userId, tenantId, false)).thenReturn(user);
         when(userMapper.toDto(user)).thenReturn(dto);
 
         ResponseEntity<UserResponse> response = userController.deactivate(tenantId, userId);
@@ -190,7 +190,7 @@ class UserControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().isActive()).isFalse();
-        verify(userService).setActive(userId, tenantId, false);
+        verify(userServiceImpl).setActive(userId, tenantId, false);
     }
 
     @Test
@@ -214,7 +214,7 @@ class UserControllerTest {
                 .active(true)
                 .build();
 
-        when(userService.changeRole(userId, tenantId, Role.ADMIN)).thenReturn(updatedUser);
+        when(userServiceImpl.changeRole(userId, tenantId, Role.ADMIN)).thenReturn(updatedUser);
         when(userMapper.toDto(updatedUser)).thenReturn(dto);
 
         ResponseEntity<UserResponse> response =
@@ -223,7 +223,7 @@ class UserControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getRole()).isEqualTo(Role.ADMIN);
-        verify(userService).changeRole(userId, tenantId, Role.ADMIN);
+        verify(userServiceImpl).changeRole(userId, tenantId, Role.ADMIN);
     }
 
     @Test
@@ -232,12 +232,12 @@ class UserControllerTest {
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
-        doNothing().when(userService).delete(userId, tenantId);
+        doNothing().when(userServiceImpl).delete(userId, tenantId);
 
         ResponseEntity<Void> response = userController.delete(tenantId, userId);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        verify(userService).delete(userId, tenantId);
+        verify(userServiceImpl).delete(userId, tenantId);
     }
 }
 

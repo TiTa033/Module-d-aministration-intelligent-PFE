@@ -11,13 +11,13 @@ import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
+import talan.pfe.rulengine.mappers.RuleActionMapper;
 import talan.pfe.rulengine.repositories.RuleActionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.RuleActionService;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -27,14 +27,15 @@ public class RuleActionServiceImpl implements RuleActionService {
     private final RuleSetRepository ruleSetRepository;
     private final RuleRepository ruleRepository;
     private final RuleActionRepository ruleActionRepository;
+    private final RuleActionMapper ruleActionMapper;
 
     @Override
     @Transactional
-    public RuleActionResponse create(UUID ruleSetId,
-                                     UUID ruleId,
-                                     UUID tenantId,
+    public RuleActionResponse create(Long ruleSetId, Long ruleId,
+                                     Long tenantId,
                                      RuleActionRequest request) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
+
         if (rule.getRuleSet().getStatus() == RuleSetStatus.ARCHIVED) {
             throw new BadRequestException(
                     "Cannot modify actions of an archived RuleSet");
@@ -47,41 +48,35 @@ public class RuleActionServiceImpl implements RuleActionService {
                 .rule(rule)
                 .build();
 
-        return RuleActionResponse.from(ruleActionRepository.save(action));
+        return ruleActionMapper.toDto(ruleActionRepository.save(action));
     }
 
     @Override
-    public List<RuleActionResponse> getAll(UUID ruleSetId,
-                                           UUID ruleId,
-                                           UUID tenantId) {
+    public List<RuleActionResponse> getAll(Long ruleSetId, Long ruleId,
+                                           Long tenantId) {
         findRuleOrThrow(ruleSetId, ruleId, tenantId);
-        return ruleActionRepository.findAllByRuleIdOrderByIdAsc(ruleId)
-                .stream()
-                .map(RuleActionResponse::from)
-                .toList();
+        return ruleActionMapper.toDtoList(
+                ruleActionRepository.findAllByRuleIdOrderByIdAsc(ruleId));
     }
 
     @Override
-    public RuleActionResponse getById(UUID ruleSetId,
-                                      UUID ruleId,
-                                      UUID id,
-                                      UUID tenantId) {
+    public RuleActionResponse getById(Long ruleSetId, Long ruleId,
+                                      Long id, Long tenantId) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
         RuleAction action = ruleActionRepository.findById(id)
                 .filter(a -> a.getRule().getId().equals(rule.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleAction not found with id: " + id));
-        return RuleActionResponse.from(action);
+        return ruleActionMapper.toDto(action);
     }
 
     @Override
     @Transactional
-    public RuleActionResponse update(UUID ruleSetId,
-                                     UUID ruleId,
-                                     UUID id,
-                                     UUID tenantId,
+    public RuleActionResponse update(Long ruleSetId, Long ruleId,
+                                     Long id, Long tenantId,
                                      RuleActionRequest request) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
+
         if (rule.getRuleSet().getStatus() == RuleSetStatus.ARCHIVED) {
             throw new BadRequestException(
                     "Cannot modify actions of an archived RuleSet");
@@ -96,16 +91,15 @@ public class RuleActionServiceImpl implements RuleActionService {
         action.setOutputKey(request.getOutputKey());
         action.setOutputValue(request.getOutputValue());
 
-        return RuleActionResponse.from(ruleActionRepository.save(action));
+        return ruleActionMapper.toDto(ruleActionRepository.save(action));
     }
 
     @Override
     @Transactional
-    public void delete(UUID ruleSetId,
-                       UUID ruleId,
-                       UUID id,
-                       UUID tenantId) {
+    public void delete(Long ruleSetId, Long ruleId,
+                       Long id, Long tenantId) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
+
         if (rule.getRuleSet().getStatus() == RuleSetStatus.ARCHIVED) {
             throw new BadRequestException(
                     "Cannot delete actions from an archived RuleSet");
@@ -119,10 +113,10 @@ public class RuleActionServiceImpl implements RuleActionService {
         ruleActionRepository.delete(action);
     }
 
-    private Rule findRuleOrThrow(UUID ruleSetId,
-                                 UUID ruleId,
-                                 UUID tenantId) {
-        RuleSet ruleSet = ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId)
+    private Rule findRuleOrThrow(Long ruleSetId, Long ruleId,
+                                 Long tenantId) {
+        RuleSet ruleSet = ruleSetRepository
+                .findByIdAndTenantId(ruleSetId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleSet not found with id: " + ruleSetId));
 
@@ -131,4 +125,3 @@ public class RuleActionServiceImpl implements RuleActionService {
                         "Rule not found with id: " + ruleId));
     }
 }
-

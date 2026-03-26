@@ -1,29 +1,29 @@
 package talan.pfe.rulengine.services.serviceImpl;
 
-
 import lombok.RequiredArgsConstructor;
-import talan.pfe.rulengine.dtos.response.TenantResponse;
-import talan.pfe.rulengine.exception.BadRequestException;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import talan.pfe.rulengine.dtos.response.PageResponse;
 import talan.pfe.rulengine.dtos.request.*;
+import talan.pfe.rulengine.dtos.response.PageResponse;
+import talan.pfe.rulengine.dtos.response.TenantResponse;
 import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.enums.TenantStatus;
 import talan.pfe.rulengine.exception.*;
+import talan.pfe.rulengine.mappers.TenantMapper;
 import talan.pfe.rulengine.repositories.TenantRepository;
-
-import java.util.UUID;
+import talan.pfe.rulengine.services.TenantService;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class TenantServiceImpl implements talan.pfe.rulengine.services.TenantService {
+public class TenantServiceImpl implements TenantService {
 
     private final TenantRepository tenantRepository;
+    private final TenantMapper tenantMapper;
 
     // ─── CREATE ─────────────────────────────────────────────
+    @Override
     @Transactional
     public TenantResponse create(CreateTenantRequest request) {
         if (tenantRepository.existsBySlug(request.getSlug())) {
@@ -36,26 +36,26 @@ public class TenantServiceImpl implements talan.pfe.rulengine.services.TenantSer
                 .slug(request.getSlug())
                 .build();
 
-        return TenantResponse.from(tenantRepository.save(tenant));
+        return tenantMapper.toDto(tenantRepository.save(tenant));
     }
 
     // ─── GET BY ID ──────────────────────────────────────────
-    public TenantResponse getById(UUID id) {
+    @Override
+    public TenantResponse getById(Long id) {
         Tenant tenant = findOrThrow(id);
         long totalUsers = tenantRepository.countUsersByTenantId(id);
-        return TenantResponse.from(tenant, totalUsers);
+        TenantResponse response = tenantMapper.toDto(tenant);
+        response.setTotalUsers(totalUsers);
+        return response;
     }
 
-    // ─── GET ALL (paginated + filterable) ───────────────────
-    public PageResponse<TenantResponse> getAll(
-            String search,
-            String status,
-            int page,
-            int size,
-            String sortBy,
-            String sortDir) {
+    // ─── GET ALL ────────────────────────────────────────────
+   @Override
+   public PageResponse<TenantResponse> getAll(
+            String search, String status,
+            int page, int size,
+            String sortBy, String sortDir) {
 
-        // Pass empty string instead of null for search
         String searchParam = (search == null) ? "" : search;
 
         TenantStatus tenantStatus = null;
@@ -78,68 +78,65 @@ public class TenantServiceImpl implements talan.pfe.rulengine.services.TenantSer
                 .findAllWithFilters(searchParam, tenantStatus, pageable)
                 .map(tenant -> {
                     long totalUsers =
-                            tenantRepository.countUsersByTenantId(tenant.getId());
-                    return TenantResponse.from(tenant, totalUsers);
+                            tenantRepository.countUsersByTenantId(
+                                    tenant.getId());
+                    TenantResponse response = tenantMapper.toDto(tenant);
+                    response.setTotalUsers(totalUsers);
+                    return response;
                 });
 
         return PageResponse.from(tenantPage);
     }
 
     // ─── UPDATE ─────────────────────────────────────────────
+    @Override
     @Transactional
-    public TenantResponse update(UUID id, UpdateTenantRequest request) {
+    public TenantResponse update(Long id, UpdateTenantRequest request) {
         Tenant tenant = findOrThrow(id);
-
         tenant.setName(request.getName());
-
-        return TenantResponse.from(tenantRepository.save(tenant));
+        return tenantMapper.toDto(tenantRepository.save(tenant));
     }
 
     // ─── ACTIVATE ───────────────────────────────────────────
+    @Override
     @Transactional
-    public TenantResponse activate(UUID id) {
+    public TenantResponse activate(Long id) {
         Tenant tenant = findOrThrow(id);
-
         if (tenant.getStatus() == TenantStatus.ACTIVE) {
-            throw new BadRequestException(
-                    "Tenant is already active");
+            throw new BadRequestException("Tenant is already active");
         }
-
         tenant.setStatus(TenantStatus.ACTIVE);
-        return TenantResponse.from(tenantRepository.save(tenant));
+        return tenantMapper.toDto(tenantRepository.save(tenant));
     }
 
     // ─── DEACTIVATE ─────────────────────────────────────────
+    @Override
     @Transactional
-    public TenantResponse deactivate(UUID id) {
+    public TenantResponse deactivate(Long id) {
         Tenant tenant = findOrThrow(id);
-
         if (tenant.getStatus() == TenantStatus.INACTIVE) {
-            throw new BadRequestException(
-                    "Tenant is already inactive");
+            throw new BadRequestException("Tenant is already inactive");
         }
-
         tenant.setStatus(TenantStatus.INACTIVE);
-        return TenantResponse.from(tenantRepository.save(tenant));
+        return tenantMapper.toDto(tenantRepository.save(tenant));
     }
 
     // ─── DELETE ─────────────────────────────────────────────
+    @Override
     @Transactional
-    public void delete(UUID id) {
+    public void delete(Long id) {
         Tenant tenant = findOrThrow(id);
-
         long totalUsers = tenantRepository.countUsersByTenantId(id);
         if (totalUsers > 0) {
             throw new BadRequestException(
-                    "Cannot delete tenant with " + totalUsers + " active users. " +
-                            "Deactivate all users first.");
+                    "Cannot delete tenant with " + totalUsers +
+                            " active users. Deactivate all users first.");
         }
-
         tenantRepository.delete(tenant);
     }
 
     // ─── PRIVATE HELPER ─────────────────────────────────────
-    private Tenant findOrThrow(UUID id) {
+    private Tenant findOrThrow(Long id) {
         return tenantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Tenant not found with id: " + id));
