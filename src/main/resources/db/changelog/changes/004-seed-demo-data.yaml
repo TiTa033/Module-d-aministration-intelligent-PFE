@@ -1,0 +1,252 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-seed-demo-data
+      author: codex
+      validCheckSum:
+        - ANY
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - tableExists:
+            tableName: tenants
+        - tableExists:
+            tableName: users
+        - tableExists:
+            tableName: rule_sets
+        - tableExists:
+            tableName: rules
+        - tableExists:
+            tableName: rule_conditions
+        - tableExists:
+            tableName: rule_actions
+      changes:
+        - sql:
+            dbms: postgresql
+            splitStatements: true
+            stripComments: true
+            sql: |
+              -- Tenants
+              INSERT INTO tenants (id, name, slug, status, created_at, updated_at)
+              SELECT nextval('tenant_seq'), 'BNP Paribas', 'bnp', 'ACTIVE', NOW(), NOW()
+              WHERE NOT EXISTS (SELECT 1 FROM tenants WHERE slug = 'bnp');
+
+              INSERT INTO tenants (id, name, slug, status, created_at, updated_at)
+              SELECT nextval('tenant_seq'), 'Societe Generale', 'sg', 'ACTIVE', NOW(), NOW()
+              WHERE NOT EXISTS (SELECT 1 FROM tenants WHERE slug = 'sg');
+
+              INSERT INTO tenants (id, name, slug, status, created_at, updated_at)
+              SELECT nextval('tenant_seq'), 'Attijariwafa', 'attijari', 'ACTIVE', NOW(), NOW()
+              WHERE NOT EXISTS (SELECT 1 FROM tenants WHERE slug = 'attijari');
+
+              -- Users (demo bcrypt hash)
+              INSERT INTO users (id, name, email, password_hash, role, tenant_id, active)
+              SELECT nextval('user_seq'), 'Admin BNP', 'admin.bnp@demo.com',
+                     '$2a$10$7QJQn6eVQxvA8Q0f0m8f7uA9lM0t2e8x8LJQy4x5J8hQjTQY8mE4K',
+                     'ADMIN',
+                     (SELECT id FROM tenants WHERE slug = 'bnp'),
+                     true
+              WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin.bnp@demo.com');
+
+              INSERT INTO users (id, name, email, password_hash, role, tenant_id, active)
+              SELECT nextval('user_seq'), 'Viewer BNP', 'viewer.bnp@demo.com',
+                     '$2a$10$7QJQn6eVQxvA8Q0f0m8f7uA9lM0t2e8x8LJQy4x5J8hQjTQY8mE4K',
+                     'VIEWER',
+                     (SELECT id FROM tenants WHERE slug = 'bnp'),
+                     true
+              WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'viewer.bnp@demo.com');
+
+              INSERT INTO users (id, name, email, password_hash, role, tenant_id, active)
+              SELECT nextval('user_seq'), 'Admin SG', 'admin.sg@demo.com',
+                     '$2a$10$7QJQn6eVQxvA8Q0f0m8f7uA9lM0t2e8x8LJQy4x5J8hQjTQY8mE4K',
+                     'ADMIN',
+                     (SELECT id FROM tenants WHERE slug = 'sg'),
+                     true
+              WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin.sg@demo.com');
+
+              INSERT INTO users (id, name, email, password_hash, role, tenant_id, active)
+              SELECT nextval('user_seq'), 'Manager SG', 'manager.sg@demo.com',
+                     '$2a$10$7QJQn6eVQxvA8Q0f0m8f7uA9lM0t2e8x8LJQy4x5J8hQjTQY8mE4K',
+                     'MANAGER',
+                     (SELECT id FROM tenants WHERE slug = 'sg'),
+                     true
+              WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'manager.sg@demo.com');
+
+              INSERT INTO users (id, name, email, password_hash, role, tenant_id, active)
+              SELECT nextval('user_seq'), 'Admin ATT', 'admin.att@demo.com',
+                     '$2a$10$7QJQn6eVQxvA8Q0f0m8f7uA9lM0t2e8x8LJQy4x5J8hQjTQY8mE4K',
+                     'ADMIN',
+                     (SELECT id FROM tenants WHERE slug = 'attijari'),
+                     true
+              WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin.att@demo.com');
+
+              -- Rule sets
+              INSERT INTO rule_sets (id, name, description, evaluation_strategy, status, current_version, tenant_id, created_at, updated_at)
+              SELECT nextval('rule_set_seq'), 'Credit Risk', 'Scoring credit risk', 'SCORE_BASED', 'ACTIVE', 1,
+                     (SELECT id FROM tenants WHERE slug = 'bnp'), NOW(), NOW()
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rule_sets
+                  WHERE name = 'Credit Risk'
+                    AND tenant_id = (SELECT id FROM tenants WHERE slug = 'bnp')
+              );
+
+              INSERT INTO rule_sets (id, name, description, evaluation_strategy, status, current_version, tenant_id, created_at, updated_at)
+              SELECT nextval('rule_set_seq'), 'KYC Validation', 'KYC checks', 'FIRST_MATCH', 'ACTIVE', 1,
+                     (SELECT id FROM tenants WHERE slug = 'bnp'), NOW(), NOW()
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rule_sets
+                  WHERE name = 'KYC Validation'
+                    AND tenant_id = (SELECT id FROM tenants WHERE slug = 'bnp')
+              );
+
+              INSERT INTO rule_sets (id, name, description, evaluation_strategy, status, current_version, tenant_id, created_at, updated_at)
+              SELECT nextval('rule_set_seq'), 'Fraud Detection', 'Fraud rules', 'ALL_MATCH', 'ACTIVE', 1,
+                     (SELECT id FROM tenants WHERE slug = 'sg'), NOW(), NOW()
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rule_sets
+                  WHERE name = 'Fraud Detection'
+                    AND tenant_id = (SELECT id FROM tenants WHERE slug = 'sg')
+              );
+
+              -- Rules
+              INSERT INTO rules (id, name, description, priority, enabled, logic_operator, score, rule_set_id, created_at, updated_at)
+              SELECT nextval('rule_seq'), 'Age > 25', 'Adult customer', 1, true, 'AND', 20,
+                     (SELECT rs.id FROM rule_sets rs
+                       JOIN tenants t ON t.id = rs.tenant_id
+                      WHERE rs.name = 'Credit Risk' AND t.slug = 'bnp'),
+                     NOW(), NOW()
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rules r
+                  WHERE r.name = 'Age > 25'
+                    AND r.rule_set_id = (SELECT rs.id FROM rule_sets rs
+                                          JOIN tenants t ON t.id = rs.tenant_id
+                                         WHERE rs.name = 'Credit Risk' AND t.slug = 'bnp')
+              );
+
+              INSERT INTO rules (id, name, description, priority, enabled, logic_operator, score, rule_set_id, created_at, updated_at)
+              SELECT nextval('rule_seq'), 'Income >= 5000', 'High income customer', 2, true, 'AND', 30,
+                     (SELECT rs.id FROM rule_sets rs
+                       JOIN tenants t ON t.id = rs.tenant_id
+                      WHERE rs.name = 'Credit Risk' AND t.slug = 'bnp'),
+                     NOW(), NOW()
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rules r
+                  WHERE r.name = 'Income >= 5000'
+                    AND r.rule_set_id = (SELECT rs.id FROM rule_sets rs
+                                          JOIN tenants t ON t.id = rs.tenant_id
+                                         WHERE rs.name = 'Credit Risk' AND t.slug = 'bnp')
+              );
+
+              INSERT INTO rules (id, name, description, priority, enabled, logic_operator, score, rule_set_id, created_at, updated_at)
+              SELECT nextval('rule_seq'), 'Blacklist Email', 'Email blacklist check', 1, true, 'OR', 0,
+                     (SELECT rs.id FROM rule_sets rs
+                       JOIN tenants t ON t.id = rs.tenant_id
+                      WHERE rs.name = 'Fraud Detection' AND t.slug = 'sg'),
+                     NOW(), NOW()
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rules r
+                  WHERE r.name = 'Blacklist Email'
+                    AND r.rule_set_id = (SELECT rs.id FROM rule_sets rs
+                                          JOIN tenants t ON t.id = rs.tenant_id
+                                         WHERE rs.name = 'Fraud Detection' AND t.slug = 'sg')
+              );
+
+              -- Rule conditions
+              INSERT INTO rule_conditions (id, field, operator, value, value_type, rule_id)
+              SELECT nextval('rule_condition_seq'), 'age', 'GREATER_THAN', '25', 'NUMBER',
+                     (SELECT r.id FROM rules r
+                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                      JOIN tenants t ON t.id = rs.tenant_id
+                      WHERE r.name = 'Age > 25' AND rs.name = 'Credit Risk' AND t.slug = 'bnp')
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rule_conditions rc
+                  WHERE rc.field = 'age'
+                    AND rc.operator = 'GREATER_THAN'
+                    AND rc.rule_id = (SELECT r.id FROM rules r
+                                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                                      JOIN tenants t ON t.id = rs.tenant_id
+                                      WHERE r.name = 'Age > 25' AND rs.name = 'Credit Risk' AND t.slug = 'bnp')
+              );
+
+              INSERT INTO rule_conditions (id, field, operator, value, value_type, rule_id)
+              SELECT nextval('rule_condition_seq'), 'monthlyIncome', 'GREATER_OR_EQUAL', '5000', 'NUMBER',
+                     (SELECT r.id FROM rules r
+                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                      JOIN tenants t ON t.id = rs.tenant_id
+                      WHERE r.name = 'Income >= 5000' AND rs.name = 'Credit Risk' AND t.slug = 'bnp')
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rule_conditions rc
+                  WHERE rc.field = 'monthlyIncome'
+                    AND rc.operator = 'GREATER_OR_EQUAL'
+                    AND rc.rule_id = (SELECT r.id FROM rules r
+                                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                                      JOIN tenants t ON t.id = rs.tenant_id
+                                      WHERE r.name = 'Income >= 5000' AND rs.name = 'Credit Risk' AND t.slug = 'bnp')
+              );
+
+              INSERT INTO rule_conditions (id, field, operator, value, value_type, rule_id)
+              SELECT nextval('rule_condition_seq'), 'email', 'CONTAINS', '@blocked.com', 'STRING',
+                     (SELECT r.id FROM rules r
+                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                      JOIN tenants t ON t.id = rs.tenant_id
+                      WHERE r.name = 'Blacklist Email' AND rs.name = 'Fraud Detection' AND t.slug = 'sg')
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rule_conditions rc
+                  WHERE rc.field = 'email'
+                    AND rc.operator = 'CONTAINS'
+                    AND rc.rule_id = (SELECT r.id FROM rules r
+                                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                                      JOIN tenants t ON t.id = rs.tenant_id
+                                      WHERE r.name = 'Blacklist Email' AND rs.name = 'Fraud Detection' AND t.slug = 'sg')
+              );
+
+              -- Rule actions
+              INSERT INTO rule_actions (id, action_type, output_key, output_value, rule_id)
+              SELECT nextval('rule_action_seq'), 'SET_SCORE', 'riskScore', '20',
+                     (SELECT r.id FROM rules r
+                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                      JOIN tenants t ON t.id = rs.tenant_id
+                      WHERE r.name = 'Age > 25' AND rs.name = 'Credit Risk' AND t.slug = 'bnp')
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rule_actions ra
+                  WHERE ra.action_type = 'SET_SCORE'
+                    AND ra.output_key = 'riskScore'
+                    AND ra.output_value = '20'
+                    AND ra.rule_id = (SELECT r.id FROM rules r
+                                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                                      JOIN tenants t ON t.id = rs.tenant_id
+                                      WHERE r.name = 'Age > 25' AND rs.name = 'Credit Risk' AND t.slug = 'bnp')
+              );
+
+              INSERT INTO rule_actions (id, action_type, output_key, output_value, rule_id)
+              SELECT nextval('rule_action_seq'), 'SET_SCORE', 'riskScore', '30',
+                     (SELECT r.id FROM rules r
+                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                      JOIN tenants t ON t.id = rs.tenant_id
+                      WHERE r.name = 'Income >= 5000' AND rs.name = 'Credit Risk' AND t.slug = 'bnp')
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rule_actions ra
+                  WHERE ra.action_type = 'SET_SCORE'
+                    AND ra.output_key = 'riskScore'
+                    AND ra.output_value = '30'
+                    AND ra.rule_id = (SELECT r.id FROM rules r
+                                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                                      JOIN tenants t ON t.id = rs.tenant_id
+                                      WHERE r.name = 'Income >= 5000' AND rs.name = 'Credit Risk' AND t.slug = 'bnp')
+              );
+
+              INSERT INTO rule_actions (id, action_type, output_key, output_value, rule_id)
+              SELECT nextval('rule_action_seq'), 'REQUIRE_REVIEW', 'decision', 'REVIEW',
+                     (SELECT r.id FROM rules r
+                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                      JOIN tenants t ON t.id = rs.tenant_id
+                      WHERE r.name = 'Blacklist Email' AND rs.name = 'Fraud Detection' AND t.slug = 'sg')
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM rule_actions ra
+                  WHERE ra.action_type = 'REQUIRE_REVIEW'
+                    AND ra.output_key = 'decision'
+                    AND ra.output_value = 'REVIEW'
+                    AND ra.rule_id = (SELECT r.id FROM rules r
+                                      JOIN rule_sets rs ON rs.id = r.rule_set_id
+                                      JOIN tenants t ON t.id = rs.tenant_id
+                                      WHERE r.name = 'Blacklist Email' AND rs.name = 'Fraud Detection' AND t.slug = 'sg')
+              );
