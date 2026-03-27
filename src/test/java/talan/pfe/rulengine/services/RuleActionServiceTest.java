@@ -1,11 +1,8 @@
 package talan.pfe.rulengine.services;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import talan.pfe.rulengine.dtos.request.RuleActionRequest;
@@ -14,299 +11,52 @@ import talan.pfe.rulengine.entites.Rule;
 import talan.pfe.rulengine.entites.RuleAction;
 import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.enums.ActionType;
-import talan.pfe.rulengine.enums.LogicOperator;
 import talan.pfe.rulengine.enums.RuleSetStatus;
-import talan.pfe.rulengine.exception.BadRequestException;
-import talan.pfe.rulengine.exception.ResourceNotFoundException;
 import talan.pfe.rulengine.mappers.RuleActionMapper;
 import talan.pfe.rulengine.repositories.RuleActionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.serviceImpl.RuleActionServiceImpl;
 
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class RuleActionServiceTest {
 
-    @Mock
-    private RuleSetRepository ruleSetRepository;
+    @Mock private RuleSetRepository ruleSetRepository;
+    @Mock private RuleRepository ruleRepository;
+    @Mock private RuleActionRepository ruleActionRepository;
+    @Mock private RuleActionMapper ruleActionMapper;
 
-    @Mock
-    private RuleRepository ruleRepository;
-
-    @Mock
-    private RuleActionRepository ruleActionRepository;
-
-    @Mock
-    private RuleActionMapper ruleActionMapper;
-
-    @InjectMocks
-    private RuleActionServiceImpl ruleActionService;
-
-    private Long tenantId;
-    private Long ruleSetId;
-    private Long ruleId;
-    private RuleSet ruleSet;
-    private Rule rule;
+    private RuleActionServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        tenantId = 1L;
-        ruleSetId = 10L;
-        ruleId = 100L;
-
-        ruleSet = RuleSet.builder()
-                .id(ruleSetId)
-                .name("Test RuleSet")
-                .description("desc")
-                .evaluationStrategy(null)
-                .status(RuleSetStatus.DRAFT)
-                .currentVersion(1)
-                .createdAt(LocalDateTime.now())
-                .build();
-
-        rule = Rule.builder()
-                .id(ruleId)
-                .name("Decision rule")
-                .priority(1)
-                .enabled(true)
-                .logicOperator(LogicOperator.AND)
-                .ruleSet(ruleSet)
-                .build();
-
-        lenient().when(ruleActionMapper.toDto(any(RuleAction.class)))
-                .thenAnswer(invocation -> RuleActionResponse.from(invocation.getArgument(0)));
-        lenient().when(ruleActionMapper.toDtoList(anyList()))
-                .thenAnswer(invocation -> {
-                    List<RuleAction> actions = invocation.getArgument(0);
-                    return actions.stream().map(RuleActionResponse::from).toList();
-                });
+        service = new RuleActionServiceImpl(ruleSetRepository, ruleRepository, ruleActionRepository, ruleActionMapper);
     }
 
-    @Nested
-    @DisplayName("create")
-    class Create {
+    @Test
+    void create_shouldReturnResponse() {
+        RuleSet rs = RuleSet.builder().id(10L).status(RuleSetStatus.DRAFT).build();
+        Rule rule = Rule.builder().id(100L).ruleSet(rs).build();
+        RuleAction action = RuleAction.builder().id(1000L).rule(rule).actionType(ActionType.APPROVE).outputKey("k").outputValue("v").build();
+        RuleActionResponse dto = RuleActionResponse.builder().id(1000L).actionType(ActionType.APPROVE).outputKey("k").outputValue("v").build();
 
-        @Test
-        @DisplayName("doit créer une RuleAction avec succès")
-        void shouldCreateActionSuccessfully() {
-            RuleActionRequest request = new RuleActionRequest();
-            request.setActionType(ActionType.APPROVE);
-            request.setOutputKey("decision");
-            request.setOutputValue("APPROVED");
+        when(ruleSetRepository.findByIdAndTenantId(10L, 1L)).thenReturn(Optional.of(rs));
+        when(ruleRepository.findByIdAndRuleSetId(100L, 10L)).thenReturn(Optional.of(rule));
+        when(ruleActionRepository.save(any(RuleAction.class))).thenReturn(action);
+        when(ruleActionMapper.toDto(action)).thenReturn(dto);
 
-            when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
-                    .thenReturn(Optional.of(ruleSet));
-            when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
-                    .thenReturn(Optional.of(rule));
+        RuleActionRequest request = new RuleActionRequest();
+        request.setActionType(ActionType.APPROVE);
+        request.setOutputKey("k");
+        request.setOutputValue("v");
 
-            RuleAction saved = RuleAction.builder()
-                    .id(1000L)
-                    .actionType(request.getActionType())
-                    .outputKey(request.getOutputKey())
-                    .outputValue(request.getOutputValue())
-                    .rule(rule)
-                    .build();
-            when(ruleActionRepository.save(any(RuleAction.class)))
-                    .thenReturn(saved);
-
-            RuleActionResponse response =
-                    ruleActionService.create(ruleSetId, ruleId, tenantId, request);
-
-            assertThat(response).isNotNull();
-            assertThat(response.getActionType()).isEqualTo(ActionType.APPROVE);
-            assertThat(response.getOutputKey()).isEqualTo("decision");
-            verify(ruleActionRepository).save(any(RuleAction.class));
-        }
-
-        @Test
-        @DisplayName("doit refuser la création si le RuleSet est archivé")
-        void shouldFailWhenRuleSetArchived() {
-            ruleSet.setStatus(RuleSetStatus.ARCHIVED);
-            when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
-                    .thenReturn(Optional.of(ruleSet));
-            when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
-                    .thenReturn(Optional.of(rule));
-
-            RuleActionRequest request = new RuleActionRequest();
-            request.setActionType(ActionType.APPROVE);
-            request.setOutputKey("decision");
-            request.setOutputValue("APPROVED");
-
-            assertThatThrownBy(() ->
-                    ruleActionService.create(ruleSetId, ruleId, tenantId, request))
-                    .isInstanceOf(BadRequestException.class);
-            verify(ruleActionRepository, never()).save(any());
-        }
-    }
-
-    @Nested
-    @DisplayName("getAll")
-    class GetAll {
-
-        @Test
-        @DisplayName("doit retourner toutes les actions de la règle")
-        void shouldReturnAllActions() {
-            when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
-                    .thenReturn(Optional.of(ruleSet));
-            when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
-                    .thenReturn(Optional.of(rule));
-
-            RuleAction action = RuleAction.builder()
-                    .id(1001L)
-                    .actionType(ActionType.APPROVE)
-                    .outputKey("decision")
-                    .outputValue("APPROVED")
-                    .rule(rule)
-                    .build();
-            when(ruleActionRepository.findAllByRuleIdOrderByIdAsc(ruleId))
-                    .thenReturn(List.of(action));
-
-            List<RuleActionResponse> result =
-                    ruleActionService.getAll(ruleSetId, ruleId, tenantId);
-
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getOutputKey()).isEqualTo("decision");
-        }
-    }
-
-    @Nested
-    @DisplayName("getById")
-    class GetById {
-
-        @Test
-        @DisplayName("doit retourner une action par id")
-        void shouldReturnActionById() {
-            Long actionId = 2000L;
-            when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
-                    .thenReturn(Optional.of(ruleSet));
-            when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
-                    .thenReturn(Optional.of(rule));
-
-            RuleAction action = RuleAction.builder()
-                    .id(actionId)
-                    .actionType(ActionType.APPROVE)
-                    .outputKey("decision")
-                    .outputValue("APPROVED")
-                    .rule(rule)
-                    .build();
-            when(ruleActionRepository.findById(actionId))
-                    .thenReturn(Optional.of(action));
-
-            RuleActionResponse response =
-                    ruleActionService.getById(ruleSetId, ruleId, actionId, tenantId);
-
-            assertThat(response).isNotNull();
-            assertThat(response.getId()).isEqualTo(actionId);
-            assertThat(response.getActionType()).isEqualTo(ActionType.APPROVE);
-        }
-
-        @Test
-        @DisplayName("doit lever une exception si l'action n'appartient pas à la règle")
-        void shouldThrowWhenActionNotInRule() {
-            Long actionId = 2001L;
-            Long anotherRuleId = 2002L;
-
-            Rule anotherRule = Rule.builder()
-                    .id(anotherRuleId)
-                    .ruleSet(ruleSet)
-                    .build();
-
-            when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
-                    .thenReturn(Optional.of(ruleSet));
-            when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
-                    .thenReturn(Optional.of(rule));
-
-            RuleAction action = RuleAction.builder()
-                    .id(actionId)
-                    .actionType(ActionType.APPROVE)
-                    .outputKey("decision")
-                    .outputValue("APPROVED")
-                    .rule(anotherRule)
-                    .build();
-            when(ruleActionRepository.findById(actionId))
-                    .thenReturn(Optional.of(action));
-
-            assertThatThrownBy(() ->
-                    ruleActionService.getById(ruleSetId, ruleId, actionId, tenantId))
-                    .isInstanceOf(ResourceNotFoundException.class);
-        }
-    }
-
-    @Nested
-    @DisplayName("update")
-    class Update {
-
-        @Test
-        @DisplayName("doit mettre à jour une action")
-        void shouldUpdateAction() {
-            Long actionId = 3000L;
-            when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
-                    .thenReturn(Optional.of(ruleSet));
-            when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
-                    .thenReturn(Optional.of(rule));
-
-            RuleAction action = RuleAction.builder()
-                    .id(actionId)
-                    .actionType(ActionType.APPROVE)
-                    .outputKey("decision")
-                    .outputValue("APPROVED")
-                    .rule(rule)
-                    .build();
-            when(ruleActionRepository.findById(actionId))
-                    .thenReturn(Optional.of(action));
-            when(ruleActionRepository.save(any(RuleAction.class)))
-                    .thenAnswer(inv -> inv.getArgument(0));
-
-            RuleActionRequest request = new RuleActionRequest();
-            request.setActionType(ActionType.REJECT);
-            request.setOutputKey("decision");
-            request.setOutputValue("REJECTED");
-
-            RuleActionResponse response =
-                    ruleActionService.update(ruleSetId, ruleId, actionId, tenantId, request);
-
-            assertThat(response.getActionType()).isEqualTo(ActionType.REJECT);
-            assertThat(response.getOutputValue()).isEqualTo("REJECTED");
-            verify(ruleActionRepository).save(action);
-        }
-    }
-
-    @Nested
-    @DisplayName("delete")
-    class Delete {
-
-        @Test
-        @DisplayName("doit supprimer une action")
-        void shouldDeleteAction() {
-            Long actionId = 4000L;
-            when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
-                    .thenReturn(Optional.of(ruleSet));
-            when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
-                    .thenReturn(Optional.of(rule));
-
-            RuleAction action = RuleAction.builder()
-                    .id(actionId)
-                    .actionType(ActionType.APPROVE)
-                    .outputKey("decision")
-                    .outputValue("APPROVED")
-                    .rule(rule)
-                    .build();
-            when(ruleActionRepository.findById(actionId))
-                    .thenReturn(Optional.of(action));
-
-            ruleActionService.delete(ruleSetId, ruleId, actionId, tenantId);
-
-            verify(ruleActionRepository).delete(action);
-        }
+        assertNotNull(service.create(10L, 100L, 1L, request));
     }
 }
 

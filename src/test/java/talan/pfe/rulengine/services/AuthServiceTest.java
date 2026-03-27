@@ -26,7 +26,6 @@ import talan.pfe.rulengine.security.CustomUserDetailsService;
 import talan.pfe.rulengine.security.JwtService;
 import talan.pfe.rulengine.services.serviceImpl.AuthServiceImpl;
 import talan.pfe.rulengine.services.serviceImpl.CaptchaService;
-import talan.pfe.rulengine.services.serviceImpl.EmailService;
 import talan.pfe.rulengine.services.serviceImpl.MailService;
 import talan.pfe.rulengine.services.serviceImpl.OtpService;
 import talan.pfe.rulengine.services.serviceImpl.RefreshTokenService;
@@ -34,7 +33,6 @@ import talan.pfe.rulengine.services.serviceImpl.RefreshTokenService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,7 +49,6 @@ class AuthServiceTest {
     @Mock private RefreshTokenService refreshTokenService;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private OtpService otpService;
-    @Mock private EmailService emailService;
     @Mock private CaptchaService captchaService;
     @Mock private MailService mailService;
     @Mock private talan.pfe.rulengine.repositories.PasswordResetTokenRepository passwordResetTokenRepository;
@@ -78,17 +75,16 @@ class AuthServiceTest {
                 passwordResetTokenRepository,
                 mailService,
                 otpService,
-                emailService,
                 captchaService
         );
         mockTenant = new Tenant();
-        mockTenant.setId(UUID.randomUUID());
+        mockTenant.setId(1L);
         mockTenant.setName("BNP Paribas");
         mockTenant.setSlug("bnp");
         mockTenant.setStatus(TenantStatus.ACTIVE);
 
         mockUser = new User();
-        mockUser.setId(UUID.randomUUID());
+        mockUser.setId(10L);
         mockUser.setEmail("amine@bnp.com");
         mockUser.setPasswordHash("hashedpassword");
         mockUser.setRole(Role.ADMIN);
@@ -102,8 +98,8 @@ class AuthServiceTest {
         );
 
         mockRefreshToken = RefreshToken.builder()
-                .id(UUID.randomUUID())
-                .token(UUID.randomUUID().toString())
+                .id(100L)
+                .token(java.util.UUID.randomUUID().toString())
                 .user(mockUser)
                 .expiresAt(LocalDateTime.now().plusDays(7))
                 .revoked(false)
@@ -126,7 +122,7 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(mockUser));
         doNothing().when(captchaService).verify(any());
         when(otpService.generateAndStore("amine@bnp.com")).thenReturn("123456");
-        doNothing().when(emailService).sendOtpEmail("amine@bnp.com", "123456");
+        doNothing().when(mailService).sendOtpEmail("amine@bnp.com", "123456");
 
         // Act
         AuthResponse response = authService.login(request);
@@ -141,7 +137,7 @@ class AuthServiceTest {
         verify(authenticationManager, times(1)).authenticate(any());
         verify(userRepository, times(1)).findByEmail("amine@bnp.com");
         verify(otpService, times(1)).generateAndStore("amine@bnp.com");
-        verify(emailService, times(1)).sendOtpEmail("amine@bnp.com", "123456");
+        verify(mailService, times(1)).sendOtpEmail("amine@bnp.com", "123456");
     }
 
     @Test
@@ -173,7 +169,7 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(mockUser));
         doNothing().when(captchaService).verify(any());
         when(otpService.generateAndStore("amine@bnp.com")).thenReturn("123456");
-        doNothing().when(emailService).sendOtpEmail("amine@bnp.com", "123456");
+        doNothing().when(mailService).sendOtpEmail("amine@bnp.com", "123456");
 
         // Act
         AuthResponse response = authService.login(request);
@@ -190,8 +186,8 @@ class AuthServiceTest {
         // Arrange
         String oldToken = mockRefreshToken.getToken();
         RefreshToken newRefreshToken = RefreshToken.builder()
-                .id(UUID.randomUUID())
-                .token(UUID.randomUUID().toString())
+                .id(101L)
+                .token(java.util.UUID.randomUUID().toString())
                 .user(mockUser)
                 .expiresAt(LocalDateTime.now().plusDays(7))
                 .revoked(false)
