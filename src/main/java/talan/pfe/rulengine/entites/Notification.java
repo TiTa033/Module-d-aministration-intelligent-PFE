@@ -5,7 +5,6 @@ import lombok.*;
 import talan.pfe.rulengine.enums.NotifType;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(
@@ -24,9 +23,14 @@ import java.util.UUID;
 public class Notification {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "notification_seq_gen")
+    @SequenceGenerator(
+            name = "notification_seq_gen",
+            sequenceName = "notification_seq",
+            allocationSize = 1
+    )
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false)
@@ -51,7 +55,7 @@ public class Notification {
     private String entityType;
 
     @Column(name = "entity_id")
-    private UUID entityId;
+    private Long entityId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

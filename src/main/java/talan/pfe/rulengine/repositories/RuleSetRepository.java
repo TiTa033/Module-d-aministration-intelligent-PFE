@@ -10,22 +10,21 @@ import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 
 import java.util.Optional;
-import java.util.UUID;
 
 @Repository
-public interface RuleSetRepository extends JpaRepository<RuleSet, UUID> {
+public interface RuleSetRepository extends JpaRepository<RuleSet, Long> {
 
-    boolean existsByNameAndTenantId(String name, UUID tenantId);
+    boolean existsByNameAndTenantId(String name, Long tenantId);
 
-    boolean existsByNameAndTenantIdAndIdNot(String name, UUID tenantId, UUID id);
+    boolean existsByNameAndTenantIdAndIdNot(String name, Long tenantId, Long id);
 
-    Optional<RuleSet> findByIdAndTenantId(UUID id, UUID tenantId);
+    Optional<RuleSet> findByIdAndTenantId(Long id, Long tenantId);
 
     @Query("SELECT r FROM RuleSet r WHERE r.tenant.id = :tenantId " +
             "AND (:search = '' OR LOWER(r.name) LIKE LOWER(CONCAT('%', :search, '%'))) " +
             "AND (:status IS NULL OR r.status = :status)")
     Page<RuleSet> findAllByTenantWithFilters(
-            @Param("tenantId") UUID tenantId,
+            @Param("tenantId") Long tenantId,
             @Param("search") String search,
             @Param("status") RuleSetStatus status,
             Pageable pageable

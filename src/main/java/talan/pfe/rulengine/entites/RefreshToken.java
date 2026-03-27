@@ -3,7 +3,6 @@ package talan.pfe.rulengine.entites;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(
@@ -21,9 +20,14 @@ import java.util.UUID;
 public class RefreshToken {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "refresh_token_seq_gen")
+    @SequenceGenerator(
+            name = "refresh_token_seq_gen",
+            sequenceName = "refresh_token_seq",
+            allocationSize = 1
+    )
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @Column(name = "token", nullable = false, unique = true)
     private String token;

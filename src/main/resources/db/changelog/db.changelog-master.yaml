@@ -1,5 +1,7 @@
 databaseChangeLog:
   - include:
+      file: db/changelog/changes/000-create-sequences.yaml
+  - include:
       file: db/changelog/changes/001-baseline.yaml
   - include:
       file: db/changelog/changes/004-seed-demo-data.yaml

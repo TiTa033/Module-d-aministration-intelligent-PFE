@@ -18,6 +18,7 @@ import talan.pfe.rulengine.enums.LogicOperator;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
+import talan.pfe.rulengine.mappers.RuleActionMapper;
 import talan.pfe.rulengine.repositories.RuleActionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
@@ -26,7 +27,6 @@ import talan.pfe.rulengine.services.serviceImpl.RuleActionServiceImpl;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,20 +45,23 @@ class RuleActionServiceTest {
     @Mock
     private RuleActionRepository ruleActionRepository;
 
+    @Mock
+    private RuleActionMapper ruleActionMapper;
+
     @InjectMocks
     private RuleActionServiceImpl ruleActionService;
 
-    private UUID tenantId;
-    private UUID ruleSetId;
-    private UUID ruleId;
+    private Long tenantId;
+    private Long ruleSetId;
+    private Long ruleId;
     private RuleSet ruleSet;
     private Rule rule;
 
     @BeforeEach
     void setUp() {
-        tenantId = UUID.randomUUID();
-        ruleSetId = UUID.randomUUID();
-        ruleId = UUID.randomUUID();
+        tenantId = 1L;
+        ruleSetId = 10L;
+        ruleId = 100L;
 
         ruleSet = RuleSet.builder()
                 .id(ruleSetId)
@@ -78,6 +81,14 @@ class RuleActionServiceTest {
                 .logicOperator(LogicOperator.AND)
                 .ruleSet(ruleSet)
                 .build();
+
+        lenient().when(ruleActionMapper.toDto(any(RuleAction.class)))
+                .thenAnswer(invocation -> RuleActionResponse.from(invocation.getArgument(0)));
+        lenient().when(ruleActionMapper.toDtoList(anyList()))
+                .thenAnswer(invocation -> {
+                    List<RuleAction> actions = invocation.getArgument(0);
+                    return actions.stream().map(RuleActionResponse::from).toList();
+                });
     }
 
     @Nested
@@ -98,7 +109,7 @@ class RuleActionServiceTest {
                     .thenReturn(Optional.of(rule));
 
             RuleAction saved = RuleAction.builder()
-                    .id(UUID.randomUUID())
+                    .id(1000L)
                     .actionType(request.getActionType())
                     .outputKey(request.getOutputKey())
                     .outputValue(request.getOutputValue())
@@ -150,7 +161,7 @@ class RuleActionServiceTest {
                     .thenReturn(Optional.of(rule));
 
             RuleAction action = RuleAction.builder()
-                    .id(UUID.randomUUID())
+                    .id(1001L)
                     .actionType(ActionType.APPROVE)
                     .outputKey("decision")
                     .outputValue("APPROVED")
@@ -174,7 +185,7 @@ class RuleActionServiceTest {
         @Test
         @DisplayName("doit retourner une action par id")
         void shouldReturnActionById() {
-            UUID actionId = UUID.randomUUID();
+            Long actionId = 2000L;
             when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
                     .thenReturn(Optional.of(ruleSet));
             when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
@@ -201,8 +212,8 @@ class RuleActionServiceTest {
         @Test
         @DisplayName("doit lever une exception si l'action n'appartient pas à la règle")
         void shouldThrowWhenActionNotInRule() {
-            UUID actionId = UUID.randomUUID();
-            UUID anotherRuleId = UUID.randomUUID();
+            Long actionId = 2001L;
+            Long anotherRuleId = 2002L;
 
             Rule anotherRule = Rule.builder()
                     .id(anotherRuleId)
@@ -237,7 +248,7 @@ class RuleActionServiceTest {
         @Test
         @DisplayName("doit mettre à jour une action")
         void shouldUpdateAction() {
-            UUID actionId = UUID.randomUUID();
+            Long actionId = 3000L;
             when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
                     .thenReturn(Optional.of(ruleSet));
             when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
@@ -276,7 +287,7 @@ class RuleActionServiceTest {
         @Test
         @DisplayName("doit supprimer une action")
         void shouldDeleteAction() {
-            UUID actionId = UUID.randomUUID();
+            Long actionId = 4000L;
             when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
                     .thenReturn(Optional.of(ruleSet));
             when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))

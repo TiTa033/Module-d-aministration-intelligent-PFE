@@ -7,7 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "password_reset_tokens")
@@ -18,9 +17,14 @@ import java.util.UUID;
 public class PasswordResetToken {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(updatable = false, nullable = false)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "password_reset_token_seq_gen")
+    @SequenceGenerator(
+            name = "password_reset_token_seq_gen",
+            sequenceName = "password_reset_token_seq",
+            allocationSize = 1
+    )
+    @Column(name = "id", updatable = false, nullable = false)
+    private Long id;
 
     @Column(nullable = false, unique = true)
     private String token;

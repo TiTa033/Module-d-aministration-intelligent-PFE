@@ -10,16 +10,15 @@ import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.enums.TenantStatus;
 
 import java.util.Optional;
-import java.util.UUID;
 
 @Repository
-public interface TenantRepository extends JpaRepository<Tenant, UUID> {
+public interface TenantRepository extends JpaRepository<Tenant, Long> {
 
     Optional<Tenant> findBySlug(String slug);
 
     boolean existsBySlug(String slug);
 
-    boolean existsBySlugAndIdNot(String slug, UUID id);
+    boolean existsBySlugAndIdNot(String slug, Long id);
 
     // Search by name or slug with optional status filter
     @Query("SELECT t FROM Tenant t WHERE " +
@@ -33,5 +32,5 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
     );
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.tenant.id = :tenantId")
-    long countUsersByTenantId(@Param("tenantId") UUID tenantId);
+    long countUsersByTenantId(@Param("tenantId") Long tenantId);
 }

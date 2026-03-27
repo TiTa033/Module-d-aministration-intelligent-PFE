@@ -8,8 +8,6 @@ import talan.pfe.rulengine.enums.RuleSetStatus;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
-
 
 @Entity
 @Table(
@@ -26,9 +24,14 @@ import java.util.UUID;
 public class RuleSet {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_set_seq_gen")
+    @SequenceGenerator(
+            name = "rule_set_seq_gen",
+            sequenceName = "rule_set_seq",
+            allocationSize = 1
+    )
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @Column(name = "name", nullable = false)
     private String name;

@@ -9,8 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import talan.pfe.rulengine.dtos.response.TenantResponse;
 import talan.pfe.rulengine.services.TenantService;
 
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/tenants")
 @RequiredArgsConstructor
@@ -22,7 +20,7 @@ public class TenantLookupController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'VIEWER')")
     @Operation(summary = "Get tenant by ID for lookup")
-    public ResponseEntity<TenantResponse> getById(@PathVariable UUID id) {
+    public ResponseEntity<TenantResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(tenantService.getById(id));
     }
 }

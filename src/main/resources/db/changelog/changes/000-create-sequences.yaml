@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: 000-create-sequences
+      author: fix
+      changes:
+        - createSequence:
+            sequenceName: tenant_seq
+            startValue: 1
+            incrementBy: 1
+
+        - createSequence:
+            sequenceName: user_seq
+            startValue: 1
+            incrementBy: 1
+
+        - createSequence:
+            sequenceName: rule_set_seq
+            startValue: 1
+            incrementBy: 1
+
+        - createSequence:
+            sequenceName: rule_seq
+            startValue: 1
+            incrementBy: 1
+
+        - createSequence:
+            sequenceName: rule_condition_seq
+            startValue: 1
+            incrementBy: 1
+
+        - createSequence:
+            sequenceName: rule_action_seq
+            startValue: 1
+            incrementBy: 1

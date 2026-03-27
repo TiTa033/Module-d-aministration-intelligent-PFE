@@ -37,7 +37,6 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final MailService mailService;
     private final OtpService otpService;
-    private final EmailService emailService;
     private final CaptchaService captchaService;
 
     // ─── LOGIN ──────────────────────────────────────────────
@@ -54,7 +53,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow();
 
         String otp = otpService.generateAndStore(user.getEmail());
-        emailService.sendOtpEmail(user.getEmail(), otp);
+        mailService.sendOtpEmail(user.getEmail(), otp);
 
         return AuthResponse.builder()
                 .email(user.getEmail())
@@ -228,7 +227,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "User not found"));
         String otp = otpService.generateAndStore(user.getEmail());
-        emailService.sendOtpEmail(user.getEmail(), otp);
+        mailService.sendOtpEmail(user.getEmail(), otp);
     }
 
     // ─── PRIVATE HELPER ─────────────────────────────────────

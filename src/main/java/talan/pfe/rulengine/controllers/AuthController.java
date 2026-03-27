@@ -93,7 +93,6 @@ public class AuthController {
         authService.resetPassword(token, request);
         return ResponseEntity.noContent().build();
     }
-
     @PostMapping("/resend-otp")
     @Operation(summary = "Resend OTP to email")
     public ResponseEntity<Void> resendOtp(@RequestBody Map<String, String> body) {

@@ -4,9 +4,6 @@ package talan.pfe.rulengine.entites;
 import jakarta.persistence.*;
 import lombok.*;
 import talan.pfe.rulengine.enums.ActionType;
-
-import java.util.UUID;
-
 @Entity
 @Table(name = "rule_actions")
 @Getter
@@ -17,9 +14,14 @@ import java.util.UUID;
 public class RuleAction {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_action_seq_gen")
+    @SequenceGenerator(
+            name = "rule_action_seq_gen",
+            sequenceName = "rule_action_seq",
+            allocationSize = 1
+    )
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "action_type", nullable = false)

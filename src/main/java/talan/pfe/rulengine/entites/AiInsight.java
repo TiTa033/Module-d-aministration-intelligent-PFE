@@ -10,7 +10,6 @@ import talan.pfe.rulengine.enums.InsightStatus;
 import talan.pfe.rulengine.enums.InsightType;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(
@@ -31,9 +30,14 @@ import java.util.UUID;
 public class AiInsight {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "ai_insight_seq_gen")
+    @SequenceGenerator(
+            name = "ai_insight_seq_gen",
+            sequenceName = "ai_insight_seq",
+            allocationSize = 1
+    )
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false)

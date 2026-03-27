@@ -19,6 +19,7 @@ import talan.pfe.rulengine.enums.Operator;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
+import talan.pfe.rulengine.mappers.RuleConditionMapper;
 import talan.pfe.rulengine.repositories.RuleConditionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
@@ -27,7 +28,6 @@ import talan.pfe.rulengine.services.serviceImpl.RuleConditionServiceImpl;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,21 +46,24 @@ class RuleConditionServiceTest {
     @Mock
     private RuleConditionRepository ruleConditionRepository;
 
+    @Mock
+    private RuleConditionMapper ruleConditionMapper;
+
     @InjectMocks
     private
     RuleConditionServiceImpl ruleConditionService;
 
-    private UUID tenantId;
-    private UUID ruleSetId;
-    private UUID ruleId;
+    private Long tenantId;
+    private Long ruleSetId;
+    private Long ruleId;
     private RuleSet ruleSet;
     private Rule rule;
 
     @BeforeEach
     void setUp() {
-        tenantId = UUID.randomUUID();
-        ruleSetId = UUID.randomUUID();
-        ruleId = UUID.randomUUID();
+        tenantId = 1L;
+        ruleSetId = 10L;
+        ruleId = 100L;
 
         ruleSet = RuleSet.builder()
                 .id(ruleSetId)
@@ -80,6 +83,14 @@ class RuleConditionServiceTest {
                 .logicOperator(LogicOperator.AND)
                 .ruleSet(ruleSet)
                 .build();
+
+        lenient().when(ruleConditionMapper.toDto(any(RuleCondition.class)))
+                .thenAnswer(invocation -> RuleConditionResponse.from(invocation.getArgument(0)));
+        lenient().when(ruleConditionMapper.toDtoList(anyList()))
+                .thenAnswer(invocation -> {
+                    List<RuleCondition> conditions = invocation.getArgument(0);
+                    return conditions.stream().map(RuleConditionResponse::from).toList();
+                });
     }
 
     @Nested
@@ -101,7 +112,7 @@ class RuleConditionServiceTest {
                     .thenReturn(Optional.of(rule));
 
             RuleCondition saved = RuleCondition.builder()
-                    .id(UUID.randomUUID())
+                    .id(1000L)
                     .field(request.getField())
                     .operator(request.getOperator())
                     .value(request.getValue())
@@ -156,7 +167,7 @@ class RuleConditionServiceTest {
                     .thenReturn(Optional.of(rule));
 
             RuleCondition cond = RuleCondition.builder()
-                    .id(UUID.randomUUID())
+                    .id(1001L)
                     .field("age")
                     .operator(Operator.GREATER_OR_EQUAL)
                     .value("18")
@@ -181,7 +192,7 @@ class RuleConditionServiceTest {
         @Test
         @DisplayName("doit retourner une condition par id")
         void shouldReturnConditionById() {
-            UUID conditionId = UUID.randomUUID();
+            Long conditionId = 2000L;
             when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
                     .thenReturn(Optional.of(ruleSet));
             when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
@@ -209,8 +220,8 @@ class RuleConditionServiceTest {
         @Test
         @DisplayName("doit lever une exception si la condition n'appartient pas à la règle")
         void shouldThrowWhenConditionNotInRule() {
-            UUID conditionId = UUID.randomUUID();
-            UUID anotherRuleId = UUID.randomUUID();
+            Long conditionId = 2001L;
+            Long anotherRuleId = 2002L;
 
             Rule anotherRule = Rule.builder()
                     .id(anotherRuleId)
@@ -246,7 +257,7 @@ class RuleConditionServiceTest {
         @Test
         @DisplayName("doit mettre à jour une condition")
         void shouldUpdateCondition() {
-            UUID conditionId = UUID.randomUUID();
+            Long conditionId = 3000L;
             when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
                     .thenReturn(Optional.of(ruleSet));
             when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))
@@ -287,7 +298,7 @@ class RuleConditionServiceTest {
         @Test
         @DisplayName("doit supprimer une condition")
         void shouldDeleteCondition() {
-            UUID conditionId = UUID.randomUUID();
+            Long conditionId = 4000L;
             when(ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId))
                     .thenReturn(Optional.of(ruleSet));
             when(ruleRepository.findByIdAndRuleSetId(ruleId, ruleSetId))

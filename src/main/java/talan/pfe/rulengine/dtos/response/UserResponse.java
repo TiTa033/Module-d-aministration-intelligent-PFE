@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import talan.pfe.rulengine.enums.Role;
 
-import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -14,11 +13,11 @@ import java.util.UUID;
 @Builder
 public class UserResponse {
 
-    private UUID id;
+    private Long id;
     private String name;
     private String email;
     private Role role;
-    private UUID tenantId;
+    private Long tenantId;
     private String tenantName;
     private boolean active;
 }

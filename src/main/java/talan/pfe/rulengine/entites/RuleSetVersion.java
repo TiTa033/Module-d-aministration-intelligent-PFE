@@ -3,10 +3,8 @@ package talan.pfe.rulengine.entites;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.Type;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "rule_set_versions")
@@ -18,9 +16,14 @@ import java.util.UUID;
 public class RuleSetVersion {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_set_seq_gen")
+    @SequenceGenerator(
+            name = "rule_set_seq_gen",
+            sequenceName = "rule_set_seq",
+            allocationSize = 1
+    )
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @Column(name = "version_number", nullable = false)
     private Integer versionNumber;

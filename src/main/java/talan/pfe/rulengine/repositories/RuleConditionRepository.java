@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface RuleConditionRepository extends JpaRepository<RuleCondition, UUID> {
+public interface RuleConditionRepository extends JpaRepository<RuleCondition, Long> {
 
-    List<RuleCondition> findAllByRuleIdOrderByIdAsc(UUID ruleId);
+    List<RuleCondition> findAllByRuleIdOrderByIdAsc(Long ruleId);
 }
 

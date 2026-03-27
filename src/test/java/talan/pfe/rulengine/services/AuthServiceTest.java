@@ -25,11 +25,11 @@ import talan.pfe.rulengine.repositories.UserRepository;
 import talan.pfe.rulengine.security.CustomUserDetailsService;
 import talan.pfe.rulengine.security.JwtService;
 import talan.pfe.rulengine.services.serviceImpl.AuthServiceImpl;
-import talan.pfe.rulengine.services.serviceImpl.CaptchaServiceImpl;
-import talan.pfe.rulengine.services.serviceImpl.EmailServiceImpl;
-import talan.pfe.rulengine.services.serviceImpl.MailServiceImpl;
-import talan.pfe.rulengine.services.serviceImpl.OtpServiceImpl;
-import talan.pfe.rulengine.services.serviceImpl.RefreshTokenServiceImpl;
+import talan.pfe.rulengine.services.serviceImpl.CaptchaService;
+import talan.pfe.rulengine.services.serviceImpl.EmailService;
+import talan.pfe.rulengine.services.serviceImpl.MailService;
+import talan.pfe.rulengine.services.serviceImpl.OtpService;
+import talan.pfe.rulengine.services.serviceImpl.RefreshTokenService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -48,12 +48,12 @@ class AuthServiceTest {
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private JwtService jwtService;
     @Mock private CustomUserDetailsService userDetailsService;
-    @Mock private RefreshTokenServiceImpl refreshTokenService;
+    @Mock private RefreshTokenService refreshTokenService;
     @Mock private PasswordEncoder passwordEncoder;
-    @Mock private OtpServiceImpl otpService;
-    @Mock private EmailServiceImpl emailService;
-    @Mock private CaptchaServiceImpl captchaService;
-    @Mock private MailServiceImpl mailService;
+    @Mock private OtpService otpService;
+    @Mock private EmailService emailService;
+    @Mock private CaptchaService captchaService;
+    @Mock private MailService mailService;
     @Mock private talan.pfe.rulengine.repositories.PasswordResetTokenRepository passwordResetTokenRepository;
     @Mock private talan.pfe.rulengine.repositories.TenantRepository tenantRepository;
 

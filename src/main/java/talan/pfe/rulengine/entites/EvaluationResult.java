@@ -5,9 +5,6 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 import talan.pfe.rulengine.enums.EvaluationStrategy;
 
 
@@ -21,9 +18,14 @@ import talan.pfe.rulengine.enums.EvaluationStrategy;
 public class EvaluationResult {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "evaluation_result_seq_gen")
+    @SequenceGenerator(
+            name = "evaluation_result_seq_gen",
+            sequenceName = "evaluation_result_seq",
+            allocationSize = 1
+    )
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "output_payload", nullable = false, columnDefinition = "jsonb")

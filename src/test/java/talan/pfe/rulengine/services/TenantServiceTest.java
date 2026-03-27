@@ -15,13 +15,13 @@ import talan.pfe.rulengine.enums.TenantStatus;
 import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ConflictException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
+import talan.pfe.rulengine.mappers.TenantMapper;
 import talan.pfe.rulengine.repositories.TenantRepository;
 import talan.pfe.rulengine.services.serviceImpl.TenantServiceImpl;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,20 +33,31 @@ class TenantServiceTest {
     @Mock
     private TenantRepository tenantRepository;
 
+    @Mock
+    private TenantMapper tenantMapper;
+
     private TenantServiceImpl tenantService;
 
     private Tenant mockTenant;
 
     @BeforeEach
     void setUp() {
-        tenantService = new TenantServiceImpl(tenantRepository);
+        tenantService = new TenantServiceImpl(tenantRepository, tenantMapper);
         mockTenant = new Tenant();
-        mockTenant.setId(UUID.randomUUID());
+        mockTenant.setId(1L);
         mockTenant.setName("BNP Paribas");
         mockTenant.setSlug("bnp");
         mockTenant.setStatus(TenantStatus.ACTIVE);
         mockTenant.setCreatedAt(LocalDateTime.now());
         mockTenant.setUpdatedAt(LocalDateTime.now());
+
+        lenient().when(tenantMapper.toDto(any(Tenant.class)))
+                .thenAnswer(invocation -> TenantResponse.from(invocation.getArgument(0)));
+        lenient().when(tenantMapper.toDto(any(Tenant.class), anyLong()))
+                .thenAnswer(invocation -> TenantResponse.from(
+                        invocation.getArgument(0),
+                        invocation.getArgument(1)
+                ));
     }
 
     // ─── CREATE TESTS ───────────────────────────────────────
@@ -92,7 +103,7 @@ class TenantServiceTest {
     @Test
     void getById_withExistingId_shouldReturnTenantResponse() {
         // Arrange
-        UUID id = mockTenant.getId();
+        Long id = mockTenant.getId();
         when(tenantRepository.findById(id))
                 .thenReturn(Optional.of(mockTenant));
         when(tenantRepository.countUsersByTenantId(id)).thenReturn(5L);
@@ -109,7 +120,7 @@ class TenantServiceTest {
     @Test
     void getById_withNonExistingId_shouldThrowResourceNotFoundException() {
         // Arrange
-        UUID id = UUID.randomUUID();
+        Long id = 999L;
         when(tenantRepository.findById(id)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -122,7 +133,7 @@ class TenantServiceTest {
     @Test
     void update_withValidRequest_shouldReturnUpdatedTenant() {
         // Arrange
-        UUID id = mockTenant.getId();
+        Long id = mockTenant.getId();
         UpdateTenantRequest request = new UpdateTenantRequest();
         request.setName("BNP Paribas Updated");
 
@@ -141,7 +152,7 @@ class TenantServiceTest {
     @Test
     void update_withNonExistingId_shouldThrowResourceNotFoundException() {
         // Arrange
-        UUID id = UUID.randomUUID();
+        Long id = 999L;
         UpdateTenantRequest request = new UpdateTenantRequest();
         request.setName("Test");
 
@@ -158,7 +169,7 @@ class TenantServiceTest {
     void activate_withInactiveTenant_shouldActivate() {
         // Arrange
         mockTenant.setStatus(TenantStatus.INACTIVE);
-        UUID id = mockTenant.getId();
+        Long id = mockTenant.getId();
 
         when(tenantRepository.findById(id))
                 .thenReturn(Optional.of(mockTenant));
@@ -176,7 +187,7 @@ class TenantServiceTest {
     void activate_withAlreadyActiveTenant_shouldThrowBadRequestException() {
         // Arrange
         mockTenant.setStatus(TenantStatus.ACTIVE);
-        UUID id = mockTenant.getId();
+        Long id = mockTenant.getId();
 
         when(tenantRepository.findById(id))
                 .thenReturn(Optional.of(mockTenant));
@@ -192,7 +203,7 @@ class TenantServiceTest {
     void deactivate_withActiveTenant_shouldDeactivate() {
         // Arrange
         mockTenant.setStatus(TenantStatus.ACTIVE);
-        UUID id = mockTenant.getId();
+        Long id = mockTenant.getId();
 
         when(tenantRepository.findById(id))
                 .thenReturn(Optional.of(mockTenant));
@@ -210,7 +221,7 @@ class TenantServiceTest {
     void deactivate_withAlreadyInactiveTenant_shouldThrowBadRequestException() {
         // Arrange
         mockTenant.setStatus(TenantStatus.INACTIVE);
-        UUID id = mockTenant.getId();
+        Long id = mockTenant.getId();
 
         when(tenantRepository.findById(id))
                 .thenReturn(Optional.of(mockTenant));
@@ -225,7 +236,7 @@ class TenantServiceTest {
     @Test
     void delete_withNoUsers_shouldDeleteSuccessfully() {
         // Arrange
-        UUID id = mockTenant.getId();
+        Long id = mockTenant.getId();
 
         when(tenantRepository.findById(id))
                 .thenReturn(Optional.of(mockTenant));
@@ -241,7 +252,7 @@ class TenantServiceTest {
     @Test
     void delete_withExistingUsers_shouldThrowBadRequestException() {
         // Arrange
-        UUID id = mockTenant.getId();
+        Long id = mockTenant.getId();
 
         when(tenantRepository.findById(id))
                 .thenReturn(Optional.of(mockTenant));
@@ -257,7 +268,7 @@ class TenantServiceTest {
     @Test
     void delete_withNonExistingId_shouldThrowResourceNotFoundException() {
         // Arrange
-        UUID id = UUID.randomUUID();
+        Long id = 999L;
         when(tenantRepository.findById(id)).thenReturn(Optional.empty());
 
         // Act & Assert

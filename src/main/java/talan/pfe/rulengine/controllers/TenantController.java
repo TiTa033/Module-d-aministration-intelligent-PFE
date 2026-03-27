@@ -12,8 +12,6 @@ import talan.pfe.rulengine.dtos.response.PageResponse;
 import talan.pfe.rulengine.dtos.response.TenantResponse;
 import talan.pfe.rulengine.services.TenantService;
 
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/admin/tenants")
 @RequiredArgsConstructor
@@ -36,7 +34,7 @@ public class TenantController {
     @GetMapping("/{id}")
     @Operation(summary = "Get tenant by ID")
     public ResponseEntity<TenantResponse> getById(
-            @PathVariable UUID id) {
+            @PathVariable Long id) {
         return ResponseEntity.ok(tenantService.getById(id));
     }
 
@@ -56,7 +54,7 @@ public class TenantController {
     @PutMapping("/{id}")
     @Operation(summary = "Update tenant name and description")
     public ResponseEntity<TenantResponse> update(
-            @PathVariable UUID id,
+            @PathVariable Long id,
             @Valid @RequestBody UpdateTenantRequest request) {
         return ResponseEntity.ok(tenantService.update(id, request));
     }
@@ -64,14 +62,14 @@ public class TenantController {
     @PatchMapping("/{id}/activate")
     @Operation(summary = "Activate a tenant")
     public ResponseEntity<TenantResponse> activate(
-            @PathVariable UUID id) {
+            @PathVariable Long id) {
         return ResponseEntity.ok(tenantService.activate(id));
     }
 
     @PatchMapping("/{id}/deactivate")
     @Operation(summary = "Deactivate a tenant")
     public ResponseEntity<TenantResponse> deactivate(
-            @PathVariable UUID id) {
+            @PathVariable Long id) {
         return ResponseEntity.ok(tenantService.deactivate(id));
     }
 
@@ -79,7 +77,7 @@ public class TenantController {
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a tenant — only if it has no users")
     public ResponseEntity<Void> delete(
-            @PathVariable UUID id) {
+            @PathVariable Long id) {
         tenantService.delete(id);
         return ResponseEntity.noContent().build();
     }

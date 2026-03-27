@@ -13,8 +13,6 @@ import talan.pfe.rulengine.dtos.response.RuleSetResponse;
 import talan.pfe.rulengine.security.JwtService;
 import talan.pfe.rulengine.services.RuleSetService;
 
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/rulesets")
 @RequiredArgsConstructor
@@ -25,13 +23,14 @@ public class RuleSetController {
     private final RuleSetService ruleSetService;
     private final JwtService jwtService;
 
-    // ─── Helper: extract tenantId from JWT ──────────────────
-    private UUID getTenantId(String authHeader) {
-        String token = authHeader.substring(7);
-        return UUID.fromString(jwtService.extractTenantId(token));
+    private Long getTenantId(String authHeader) {
+        String tenantId = jwtService.extractTenantId(
+                authHeader.substring(7));
+        return (tenantId != null && !tenantId.equals("null"))
+                ? Long.parseLong(tenantId)
+                : null;
     }
 
-    // ─── CREATE ─────────────────────────────────────────────
     @PostMapping
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER')")
     @Operation(summary = "Create a new RuleSet")
@@ -43,7 +42,6 @@ public class RuleSetController {
                 .body(ruleSetService.create(request, getTenantId(authHeader)));
     }
 
-    // ─── GET ALL ────────────────────────────────────────────
     @GetMapping
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER', 'VIEWER')")
     @Operation(summary = "Get all RuleSets for the current tenant")
@@ -60,68 +58,62 @@ public class RuleSetController {
                 search, status, page, size, sortBy, sortDir));
     }
 
-    // ─── GET BY ID ──────────────────────────────────────────
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER', 'VIEWER')")
     @Operation(summary = "Get RuleSet by ID")
     public ResponseEntity<RuleSetResponse> getById(
-            @PathVariable UUID id,
+            @PathVariable Long id,
             @RequestHeader("Authorization") String authHeader) {
         return ResponseEntity.ok(
                 ruleSetService.getById(id, getTenantId(authHeader)));
     }
 
-    // ─── UPDATE ─────────────────────────────────────────────
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER')")
     @Operation(summary = "Update a RuleSet")
     public ResponseEntity<RuleSetResponse> update(
-            @PathVariable UUID id,
+            @PathVariable Long id,
             @Valid @RequestBody UpdateRuleSetRequest request,
             @RequestHeader("Authorization") String authHeader) {
         return ResponseEntity.ok(
                 ruleSetService.update(id, getTenantId(authHeader), request));
     }
 
-    // ─── ACTIVATE ───────────────────────────────────────────
     @PatchMapping("/{id}/activate")
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN')")
     @Operation(summary = "Activate a RuleSet")
     public ResponseEntity<RuleSetResponse> activate(
-            @PathVariable UUID id,
+            @PathVariable Long id,
             @RequestHeader("Authorization") String authHeader) {
         return ResponseEntity.ok(
                 ruleSetService.activate(id, getTenantId(authHeader)));
     }
 
-    // ─── ARCHIVE ────────────────────────────────────────────
     @PatchMapping("/{id}/archive")
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN')")
     @Operation(summary = "Archive a RuleSet")
     public ResponseEntity<RuleSetResponse> archive(
-            @PathVariable UUID id,
+            @PathVariable Long id,
             @RequestHeader("Authorization") String authHeader) {
         return ResponseEntity.ok(
                 ruleSetService.archive(id, getTenantId(authHeader)));
     }
 
-    // ─── MOVE TO DRAFT ──────────────────────────────────────
     @PatchMapping("/{id}/draft")
-    @PreAuthorize("hasAnyRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN')")
     @Operation(summary = "Move RuleSet back to Draft")
     public ResponseEntity<RuleSetResponse> moveToDraft(
-            @PathVariable UUID id,
+            @PathVariable Long id,
             @RequestHeader("Authorization") String authHeader) {
         return ResponseEntity.ok(
                 ruleSetService.moveToDraft(id, getTenantId(authHeader)));
     }
 
-    // ─── DELETE ─────────────────────────────────────────────
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN')")
     @Operation(summary = "Delete a RuleSet — only if not ACTIVE")
     public ResponseEntity<Void> delete(
-            @PathVariable UUID id,
+            @PathVariable Long id,
             @RequestHeader("Authorization") String authHeader) {
         ruleSetService.delete(id, getTenantId(authHeader));
         return ResponseEntity.noContent().build();

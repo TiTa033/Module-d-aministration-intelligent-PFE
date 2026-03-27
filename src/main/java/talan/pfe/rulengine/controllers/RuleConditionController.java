@@ -24,6 +24,7 @@ public class RuleConditionController {
 
     private final RuleConditionService conditionService;
     private final JwtService jwtService;
+
     private Long getTenantId(String authHeader) {
         String tenantId = jwtService.extractTenantId(
                 authHeader.substring(7));
@@ -31,6 +32,7 @@ public class RuleConditionController {
                 ? Long.parseLong(tenantId)
                 : null;
     }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER')")
     @Operation(summary = "Create a new RuleCondition")

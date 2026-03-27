@@ -6,7 +6,6 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "evaluation_requests")
@@ -18,9 +17,14 @@ import java.util.UUID;
 public class EvaluationRequest {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "evaluation_request_seq_gen")
+    @SequenceGenerator(
+            name = "evaluation_request_seq_gen",
+            sequenceName = "evaluation_request_seq",
+            allocationSize = 1
+    )
     @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+    private Long id;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "input_payload", nullable = false, columnDefinition = "jsonb")
