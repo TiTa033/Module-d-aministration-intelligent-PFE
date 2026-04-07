@@ -17,6 +17,7 @@ import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.RuleService;
 import talan.pfe.rulengine.services.RuleSetVersioningService;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -156,7 +157,7 @@ public class RuleServiceImpl implements RuleService {
         findRuleSetOrThrow(ruleSetId, tenantId);
         Rule rule = findRuleOrThrow(id, ruleSetId);
 
-        if (rule.isEnabled()) {
+        if (rule.isEnabled() && rule.getPendingEnabled() == null) {
             throw new BadRequestException("Rule is already enabled");
         }
 
@@ -165,6 +166,11 @@ public class RuleServiceImpl implements RuleService {
         ruleSetVersioningService.recordSnapshot(
                 ruleSetId, tenantId, "Rule enabled: " + saved.getName());
         return ruleMapper.toDto(saved);
+        rule.setPendingEnabled(true);
+        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+
+        return ruleMapper.toDto(ruleRepository.save(rule));
+ 
     }
 
     @Override
@@ -173,7 +179,7 @@ public class RuleServiceImpl implements RuleService {
         findRuleSetOrThrow(ruleSetId, tenantId);
         Rule rule = findRuleOrThrow(id, ruleSetId);
 
-        if (!rule.isEnabled()) {
+        if (!rule.isEnabled() && rule.getPendingEnabled() == null) {
             throw new BadRequestException("Rule is already disabled");
         }
 
@@ -182,6 +188,10 @@ public class RuleServiceImpl implements RuleService {
         ruleSetVersioningService.recordSnapshot(
                 ruleSetId, tenantId, "Rule disabled: " + saved.getName());
         return ruleMapper.toDto(saved);
+        rule.setPendingEnabled(false);
+        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+
+        return ruleMapper.toDto(ruleRepository.save(rule));
     }
 
     @Override

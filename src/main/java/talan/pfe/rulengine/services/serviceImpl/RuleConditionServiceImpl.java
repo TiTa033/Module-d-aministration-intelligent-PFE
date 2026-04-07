@@ -18,6 +18,7 @@ import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.RuleConditionService;
 import talan.pfe.rulengine.services.RuleSetVersioningService;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -55,6 +56,11 @@ public class RuleConditionServiceImpl implements RuleConditionService {
         ruleSetVersioningService.recordSnapshot(
                 ruleSetId, tenantId, "Condition added to rule " + rule.getName());
         return ruleConditionMapper.toDto(saved);
+        rule.setPendingUpdate(true);
+        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+
+        return ruleConditionMapper.toDto(
+                ruleConditionRepository.save(condition));
     }
 
     @Override
@@ -98,6 +104,8 @@ public class RuleConditionServiceImpl implements RuleConditionService {
         condition.setOperator(request.getOperator());
         condition.setValue(request.getValue());
         condition.setValueType(request.getValueType());
+        rule.setPendingUpdate(true);
+        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
         RuleCondition saved = ruleConditionRepository.save(condition);
         ruleSetVersioningService.recordSnapshot(
@@ -120,6 +128,9 @@ public class RuleConditionServiceImpl implements RuleConditionService {
                 .filter(c -> c.getRule().getId().equals(rule.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleCondition not found with id: " + id));
+
+        rule.setPendingUpdate(true);
+        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
         ruleConditionRepository.delete(condition);
         ruleSetVersioningService.recordSnapshot(

@@ -18,6 +18,7 @@ import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.RuleActionService;
 import talan.pfe.rulengine.services.RuleSetVersioningService;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -50,10 +51,16 @@ public class RuleActionServiceImpl implements RuleActionService {
                 .rule(rule)
                 .build();
 
+
         RuleAction saved = ruleActionRepository.save(action);
         ruleSetVersioningService.recordSnapshot(
                 ruleSetId, tenantId, "Action added to rule " + rule.getName());
         return ruleActionMapper.toDto(saved);
+
+        rule.setPendingUpdate(true);
+        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+
+        return ruleActionMapper.toDto(ruleActionRepository.save(action));
     }
 
     @Override
@@ -100,6 +107,11 @@ public class RuleActionServiceImpl implements RuleActionService {
         ruleSetVersioningService.recordSnapshot(
                 ruleSetId, tenantId, "Action updated on rule " + rule.getName());
         return ruleActionMapper.toDto(saved);
+
+        rule.setPendingUpdate(true);
+        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+
+        return ruleActionMapper.toDto(ruleActionRepository.save(action));
     }
 
     @Override
@@ -117,6 +129,9 @@ public class RuleActionServiceImpl implements RuleActionService {
                 .filter(a -> a.getRule().getId().equals(rule.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleAction not found with id: " + id));
+
+        rule.setPendingUpdate(true);
+        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
         ruleActionRepository.delete(action);
         ruleSetVersioningService.recordSnapshot(

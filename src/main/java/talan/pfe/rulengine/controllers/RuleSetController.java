@@ -105,6 +105,16 @@ public class RuleSetController {
         return ResponseEntity.ok(
                 ruleSetService.archive(id, getTenantId(authHeader)));
     }
+    @PatchMapping("/{id}/unarchive")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Unarchive a RuleSet (ADMIN only)")
+    public ResponseEntity<RuleSetResponse> unarchive(
+            @PathVariable Long id,
+            @RequestHeader("Authorization") String authHeader) {
+
+        return ResponseEntity.ok(
+                ruleSetService.unarchive(id, getTenantId(authHeader)));
+    }
 
     @PatchMapping("/{id}/draft")
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN')")

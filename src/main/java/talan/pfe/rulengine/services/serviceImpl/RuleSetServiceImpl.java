@@ -181,6 +181,18 @@ public class RuleSetServiceImpl implements RuleSetService {
 
         ruleSetRepository.delete(ruleSet);
     }
+    @Override
+    @Transactional
+    public RuleSetResponse unarchive(Long id, Long tenantId) {
+        RuleSet ruleSet = findOrThrow(id, tenantId);
+
+        if (ruleSet.getStatus() != RuleSetStatus.ARCHIVED) {
+            throw new BadRequestException("Only archived RuleSets can be unarchived");
+        }
+
+        ruleSet.setStatus(RuleSetStatus.DRAFT); // or ACTIVE if you prefer
+        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+    }
 
     private RuleSet findOrThrow(Long id, Long tenantId) {
         return ruleSetRepository.findByIdAndTenantId(id, tenantId)

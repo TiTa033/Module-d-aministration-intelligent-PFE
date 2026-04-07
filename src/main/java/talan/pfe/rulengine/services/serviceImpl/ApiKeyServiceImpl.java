@@ -37,6 +37,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
     private static final int KEY_BYTES = 32;
 
     // ─── GENERATE ───────────────────────────────────────────
+
     @Override
     @Transactional
     public ApiKeyCreatedResponse generate(CreateApiKeyRequest request,
