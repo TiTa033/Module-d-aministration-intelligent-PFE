@@ -16,6 +16,7 @@ import talan.pfe.rulengine.repositories.RuleConditionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.RuleConditionService;
+import talan.pfe.rulengine.services.RuleSetVersioningService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,6 +30,7 @@ public class RuleConditionServiceImpl implements RuleConditionService {
     private final RuleRepository ruleRepository;
     private final RuleConditionRepository ruleConditionRepository;
     private final RuleConditionMapper ruleConditionMapper;
+    private final RuleSetVersioningService ruleSetVersioningService;
 
     @Override
     @Transactional
@@ -50,6 +52,10 @@ public class RuleConditionServiceImpl implements RuleConditionService {
                 .rule(rule)
                 .build();
 
+        RuleCondition saved = ruleConditionRepository.save(condition);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Condition added to rule " + rule.getName());
+        return ruleConditionMapper.toDto(saved);
         rule.setPendingUpdate(true);
         rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
@@ -101,8 +107,10 @@ public class RuleConditionServiceImpl implements RuleConditionService {
         rule.setPendingUpdate(true);
         rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
-        return ruleConditionMapper.toDto(
-                ruleConditionRepository.save(condition));
+        RuleCondition saved = ruleConditionRepository.save(condition);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Condition updated on rule " + rule.getName());
+        return ruleConditionMapper.toDto(saved);
     }
 
     @Override
@@ -125,6 +133,8 @@ public class RuleConditionServiceImpl implements RuleConditionService {
         rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
         ruleConditionRepository.delete(condition);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Condition deleted on rule " + rule.getName());
     }
 
     private Rule findRuleOrThrow(Long ruleSetId, Long ruleId,

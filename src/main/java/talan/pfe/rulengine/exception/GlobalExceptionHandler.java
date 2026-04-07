@@ -1,5 +1,6 @@
 package talan.pfe.rulengine.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.*;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     // ─── VALIDATION ERRORS (400) ────────────────────────────
@@ -88,19 +90,30 @@ public class GlobalExceptionHandler {
     // ─── GENERIC FALLBACK (500) ─────────────────────────────
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR,
-                "An unexpected error occurred. Please try again later.");
+        String errorId = UUID.randomUUID().toString();
+        log.error("Unhandled exception (errorId={})", errorId, ex);
+        return buildResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "An unexpected error occurred. Please try again later.",
+                errorId
+        );
     }
 
     // ─── HELPER ─────────────────────────────────────────────
     private ResponseEntity<ErrorResponse> buildResponse(
             HttpStatus status, String message) {
+        return buildResponse(status, message, null);
+    }
+
+    private ResponseEntity<ErrorResponse> buildResponse(
+            HttpStatus status, String message, String errorId) {
         return ResponseEntity
                 .status(status)
                 .body(ErrorResponse.builder()
                         .status(status.value())
                         .error(status.getReasonPhrase())
                         .message(message)
+                        .errorId(errorId)
                         .timestamp(LocalDateTime.now())
                         .build());
     }

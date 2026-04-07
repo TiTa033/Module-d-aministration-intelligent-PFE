@@ -29,4 +29,10 @@ public interface RuleSetRepository extends JpaRepository<RuleSet, Long> {
             @Param("status") RuleSetStatus status,
             Pageable pageable
     );
+
+    @Query("SELECT DISTINCT rs FROM RuleSet rs LEFT JOIN FETCH rs.rules r "
+            + "WHERE rs.id = :id AND rs.tenant.id = :tenantId")
+    Optional<RuleSet> findByIdAndTenantIdWithRules(
+            @Param("id") Long id,
+            @Param("tenantId") Long tenantId);
 }

@@ -11,6 +11,12 @@ databaseChangeLog:
       file: db/changelog/changes/006-fix-demo-password-hash.yaml
   - include:
       file: db/changelog/changes/007-force-demo-password-hash.yaml
+  - include:
+      file: db/changelog/changes/008-seed-swagger-demo.yaml
+  - include:
+      file: db/changelog/changes/009-api-key-prefix-and-version-seq.yaml
+  - include:
+      file: db/changelog/changes/010-ensure-api-keys-ruleset-link.yaml
   # NOTE:
   # The "add/drop phone" changesets were only a Liquibase test.
   # After recreating the database from scratch, there is no baseline schema yet,

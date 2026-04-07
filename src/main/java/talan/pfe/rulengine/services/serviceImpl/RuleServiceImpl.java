@@ -15,6 +15,7 @@ import talan.pfe.rulengine.mappers.RuleMapper;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.RuleService;
+import talan.pfe.rulengine.services.RuleSetVersioningService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,6 +28,7 @@ public class RuleServiceImpl implements RuleService {
     private final RuleRepository ruleRepository;
     private final RuleSetRepository ruleSetRepository;
     private final RuleMapper ruleMapper;
+    private final RuleSetVersioningService ruleSetVersioningService;
 
     @Override
     @Transactional
@@ -62,7 +64,10 @@ public class RuleServiceImpl implements RuleService {
                 .ruleSet(ruleSet)
                 .build();
 
-        return ruleMapper.toDto(ruleRepository.save(rule));
+        Rule saved = ruleRepository.save(rule);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Rule created: " + saved.getName());
+        return ruleMapper.toDto(saved);
     }
 
     @Override
@@ -140,7 +145,10 @@ public class RuleServiceImpl implements RuleService {
         rule.setLogicOperator(request.getLogicOperator());
         rule.setScore(request.getScore());
 
-        return ruleMapper.toDto(ruleRepository.save(rule));
+        Rule saved = ruleRepository.save(rule);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Rule updated: " + saved.getName());
+        return ruleMapper.toDto(saved);
     }
 
     @Override
@@ -153,10 +161,16 @@ public class RuleServiceImpl implements RuleService {
             throw new BadRequestException("Rule is already enabled");
         }
 
+        rule.setEnabled(true);
+        Rule saved = ruleRepository.save(rule);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Rule enabled: " + saved.getName());
+        return ruleMapper.toDto(saved);
         rule.setPendingEnabled(true);
         rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
         return ruleMapper.toDto(ruleRepository.save(rule));
+ 
     }
 
     @Override
@@ -169,6 +183,11 @@ public class RuleServiceImpl implements RuleService {
             throw new BadRequestException("Rule is already disabled");
         }
 
+        rule.setEnabled(false);
+        Rule saved = ruleRepository.save(rule);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Rule disabled: " + saved.getName());
+        return ruleMapper.toDto(saved);
         rule.setPendingEnabled(false);
         rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
@@ -185,7 +204,11 @@ public class RuleServiceImpl implements RuleService {
                     "Cannot delete rules from an archived RuleSet");
         }
 
-        ruleRepository.delete(findRuleOrThrow(id, ruleSetId));
+        Rule existing = findRuleOrThrow(id, ruleSetId);
+        String name = existing.getName();
+        ruleRepository.delete(existing);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Rule deleted: " + name);
     }
 
     private RuleSet findRuleSetOrThrow(Long ruleSetId, Long tenantId) {

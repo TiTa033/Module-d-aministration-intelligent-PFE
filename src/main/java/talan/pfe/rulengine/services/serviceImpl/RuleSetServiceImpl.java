@@ -16,6 +16,7 @@ import talan.pfe.rulengine.mappers.RuleSetMapper;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.repositories.TenantRepository;
 import talan.pfe.rulengine.services.RuleSetService;
+import talan.pfe.rulengine.services.RuleSetVersioningService;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +26,7 @@ public class RuleSetServiceImpl implements RuleSetService {
     private final RuleSetRepository ruleSetRepository;
     private final TenantRepository tenantRepository;
     private final RuleSetMapper ruleSetMapper;
+    private final RuleSetVersioningService ruleSetVersioningService;
 
     @Override
     @Transactional
@@ -48,7 +50,10 @@ public class RuleSetServiceImpl implements RuleSetService {
                 .tenant(tenant)
                 .build();
 
-        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+        RuleSet saved = ruleSetRepository.save(ruleSet);
+        ruleSetVersioningService.recordSnapshot(
+                saved.getId(), tenantId, "RuleSet created");
+        return ruleSetMapper.toDto(saved);
     }
 
     @Override
@@ -108,7 +113,10 @@ public class RuleSetServiceImpl implements RuleSetService {
         ruleSet.setDescription(request.getDescription());
         ruleSet.setEvaluationStrategy(request.getEvaluationStrategy());
 
-        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+        RuleSet saved = ruleSetRepository.save(ruleSet);
+        ruleSetVersioningService.recordSnapshot(
+                id, tenantId, "RuleSet metadata updated");
+        return ruleSetMapper.toDto(saved);
     }
 
     @Override
@@ -126,7 +134,9 @@ public class RuleSetServiceImpl implements RuleSetService {
         }
 
         ruleSet.setStatus(RuleSetStatus.ACTIVE);
-        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+        RuleSet saved = ruleSetRepository.save(ruleSet);
+        ruleSetVersioningService.recordSnapshot(id, tenantId, "RuleSet activated");
+        return ruleSetMapper.toDto(saved);
     }
 
     @Override
@@ -139,7 +149,9 @@ public class RuleSetServiceImpl implements RuleSetService {
         }
 
         ruleSet.setStatus(RuleSetStatus.ARCHIVED);
-        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+        RuleSet saved = ruleSetRepository.save(ruleSet);
+        ruleSetVersioningService.recordSnapshot(id, tenantId, "RuleSet archived");
+        return ruleSetMapper.toDto(saved);
     }
 
     @Override
@@ -152,7 +164,9 @@ public class RuleSetServiceImpl implements RuleSetService {
         }
 
         ruleSet.setStatus(RuleSetStatus.DRAFT);
-        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+        RuleSet saved = ruleSetRepository.save(ruleSet);
+        ruleSetVersioningService.recordSnapshot(id, tenantId, "RuleSet moved to draft");
+        return ruleSetMapper.toDto(saved);
     }
 
     @Override

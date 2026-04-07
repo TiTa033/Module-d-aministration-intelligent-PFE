@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,18 +33,23 @@ class RuleConditionServiceTest {
     @Mock private RuleRepository ruleRepository;
     @Mock private RuleConditionRepository ruleConditionRepository;
     @Mock private RuleConditionMapper ruleConditionMapper;
+    @Mock private RuleSetVersioningService ruleSetVersioningService;
 
     private RuleConditionServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new RuleConditionServiceImpl(ruleSetRepository, ruleRepository, ruleConditionRepository, ruleConditionMapper);
+        service = new RuleConditionServiceImpl(
+                ruleSetRepository, ruleRepository, ruleConditionRepository,
+                ruleConditionMapper, ruleSetVersioningService);
+        doNothing().when(ruleSetVersioningService)
+                .recordSnapshot(any(), any(), any());
     }
 
     @Test
     void create_shouldReturnResponse() {
         RuleSet rs = RuleSet.builder().id(10L).status(RuleSetStatus.DRAFT).build();
-        Rule rule = Rule.builder().id(100L).ruleSet(rs).build();
+        Rule rule = Rule.builder().id(100L).name("R1").ruleSet(rs).build();
         RuleCondition cond = RuleCondition.builder().id(1000L).rule(rule).field("age").operator(Operator.GREATER_OR_EQUAL).value("18").valueType(DataType.NUMBER).build();
         RuleConditionResponse dto = RuleConditionResponse.builder().id(1000L).field("age").operator(Operator.GREATER_OR_EQUAL).value("18").valueType(DataType.NUMBER).build();
 

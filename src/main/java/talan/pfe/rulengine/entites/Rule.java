@@ -2,6 +2,7 @@ package talan.pfe.rulengine.entites;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import talan.pfe.rulengine.enums.LogicOperator;
 
 import java.time.LocalDateTime;
@@ -56,10 +57,12 @@ public class Rule {
     private RuleSet ruleSet;
 
     @OneToMany(mappedBy = "rule", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 32)
     @Builder.Default
     private List<RuleCondition> conditions = new ArrayList<>();
 
     @OneToMany(mappedBy = "rule", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 32)
     @Builder.Default
     private List<RuleAction> actions = new ArrayList<>();
 

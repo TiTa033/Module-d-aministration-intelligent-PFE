@@ -17,6 +17,8 @@ public class ApiKeyResponse {
     private String keyPrefix;   // first 8 chars e.g. "raas_a1b" — shown in list
     private Long tenantId;
     private String tenantName;
+    private Long ruleSetId;
+    private String ruleSetName;
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt;
 }

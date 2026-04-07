@@ -22,6 +22,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,18 +32,23 @@ class RuleActionServiceTest {
     @Mock private RuleRepository ruleRepository;
     @Mock private RuleActionRepository ruleActionRepository;
     @Mock private RuleActionMapper ruleActionMapper;
+    @Mock private RuleSetVersioningService ruleSetVersioningService;
 
     private RuleActionServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new RuleActionServiceImpl(ruleSetRepository, ruleRepository, ruleActionRepository, ruleActionMapper);
+        service = new RuleActionServiceImpl(
+                ruleSetRepository, ruleRepository, ruleActionRepository,
+                ruleActionMapper, ruleSetVersioningService);
+        doNothing().when(ruleSetVersioningService)
+                .recordSnapshot(any(), any(), any());
     }
 
     @Test
     void create_shouldReturnResponse() {
         RuleSet rs = RuleSet.builder().id(10L).status(RuleSetStatus.DRAFT).build();
-        Rule rule = Rule.builder().id(100L).ruleSet(rs).build();
+        Rule rule = Rule.builder().id(100L).name("R1").ruleSet(rs).build();
         RuleAction action = RuleAction.builder().id(1000L).rule(rule).actionType(ActionType.APPROVE).outputKey("k").outputValue("v").build();
         RuleActionResponse dto = RuleActionResponse.builder().id(1000L).actionType(ActionType.APPROVE).outputKey("k").outputValue("v").build();
 

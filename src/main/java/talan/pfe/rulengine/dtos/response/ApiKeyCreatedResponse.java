@@ -16,6 +16,8 @@ public class ApiKeyCreatedResponse {
     private String rawKey;      // full key shown once: "raas_a1b2c3d4e5f6..."
     private String keyPrefix;   // first 8 chars for display in list
     private Long tenantId;
+    private Long ruleSetId;
+    private String ruleSetName;
     private java.time.LocalDateTime createdAt;
     private java.time.LocalDateTime expiresAt;
 }
