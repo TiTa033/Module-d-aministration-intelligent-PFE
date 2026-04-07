@@ -23,6 +23,9 @@ public class RuleResponse {
     private int totalActions;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Boolean pendingEnabled;
+    private LocalDateTime activationDate;
+    private Boolean pendingUpdate;
 
 
 }

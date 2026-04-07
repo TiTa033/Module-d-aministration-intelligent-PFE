@@ -27,6 +27,7 @@ public interface RuleSetService {
     RuleSetResponse archive(Long id, Long tenantId);
 
     RuleSetResponse moveToDraft(Long id, Long tenantId);
+    RuleSetResponse unarchive(Long id, Long tenantId);
 
     void delete(Long id, Long tenantId);
 }

@@ -16,6 +16,7 @@ import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.RuleService;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -148,11 +149,13 @@ public class RuleServiceImpl implements RuleService {
         findRuleSetOrThrow(ruleSetId, tenantId);
         Rule rule = findRuleOrThrow(id, ruleSetId);
 
-        if (rule.isEnabled()) {
+        if (rule.isEnabled() && rule.getPendingEnabled() == null) {
             throw new BadRequestException("Rule is already enabled");
         }
 
-        rule.setEnabled(true);
+        rule.setPendingEnabled(true);
+        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+
         return ruleMapper.toDto(ruleRepository.save(rule));
     }
 
@@ -162,11 +165,13 @@ public class RuleServiceImpl implements RuleService {
         findRuleSetOrThrow(ruleSetId, tenantId);
         Rule rule = findRuleOrThrow(id, ruleSetId);
 
-        if (!rule.isEnabled()) {
+        if (!rule.isEnabled() && rule.getPendingEnabled() == null) {
             throw new BadRequestException("Rule is already disabled");
         }
 
-        rule.setEnabled(false);
+        rule.setPendingEnabled(false);
+        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+
         return ruleMapper.toDto(ruleRepository.save(rule));
     }
 
