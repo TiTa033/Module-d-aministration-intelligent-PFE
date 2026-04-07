@@ -63,11 +63,22 @@ public class Rule {
     @Builder.Default
     private List<RuleAction> actions = new ArrayList<>();
 
+    @Column(name = "pending_enabled")
+    private Boolean pendingEnabled;
+
+    @Column(name = "activation_date")
+    private LocalDateTime activationDate;
+
+    @Column(name = "pending_update")
+    private Boolean pendingUpdate;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
         this.enabled = true;
+        this.pendingEnabled = null;
+        this.pendingUpdate = false;
     }
 
     @PreUpdate
