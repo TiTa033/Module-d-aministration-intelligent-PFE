@@ -8,11 +8,13 @@ import talan.pfe.rulengine.dtos.request.CreateApiKeyRequest;
 import talan.pfe.rulengine.dtos.response.ApiKeyCreatedResponse;
 import talan.pfe.rulengine.dtos.response.ApiKeyResponse;
 import talan.pfe.rulengine.entites.ApiKey;
+import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
 import talan.pfe.rulengine.mappers.ApiKeyMapper;
 import talan.pfe.rulengine.repositories.ApiKeyRepository;
+import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.repositories.TenantRepository;
 import talan.pfe.rulengine.services.ApiKeyService;
 
@@ -27,6 +29,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
 
     private final ApiKeyRepository apiKeyRepository;
     private final TenantRepository tenantRepository;
+    private final RuleSetRepository ruleSetRepository;
     private final ApiKeyMapper apiKeyMapper;
     private final PasswordEncoder passwordEncoder;
 
@@ -42,6 +45,11 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Tenant not found with id: " + tenantId));
 
+        RuleSet ruleSet = ruleSetRepository
+                .findByIdAndTenantId(request.getRuleSetId(), tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "RuleSet not found with id: " + request.getRuleSetId()));
+
         String rawKey = generateRawKey();
         String keyHash = passwordEncoder.encode(rawKey);
         String keyPrefix = rawKey.substring(0, 12);
@@ -49,8 +57,11 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         ApiKey apiKey = ApiKey.builder()
                 .name(request.getName())
                 .keyHash(keyHash)
+                .keyPrefix(rawKey.substring(0, Math.min(12, rawKey.length())))
                 .expiresAt(request.getExpiresAt())
                 .tenant(tenant)
+                .ruleSet(ruleSet)
+                .active(true)
                 .build();
 
         ApiKey saved = apiKeyRepository.save(apiKey);
@@ -61,6 +72,8 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                 .rawKey(rawKey)
                 .keyPrefix(keyPrefix)
                 .tenantId(tenantId)
+                .ruleSetId(ruleSet.getId())
+                .ruleSetName(ruleSet.getName())
                 .createdAt(saved.getCreatedAt())
                 .expiresAt(saved.getExpiresAt())
                 .build();
@@ -109,12 +122,16 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         apiKeyRepository.save(apiKey);
 
         Tenant tenant = apiKey.getTenant();
+        RuleSet ruleSet = apiKey.getRuleSet();
 
         ApiKey newApiKey = ApiKey.builder()
                 .name(apiKey.getName())
                 .keyHash(keyHash)
+                .keyPrefix(rawKey.substring(0, Math.min(12, rawKey.length())))
                 .expiresAt(apiKey.getExpiresAt())
                 .tenant(tenant)
+                .ruleSet(ruleSet)
+                .active(true)
                 .build();
 
         ApiKey saved = apiKeyRepository.save(newApiKey);
@@ -125,6 +142,8 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                 .rawKey(rawKey)
                 .keyPrefix(keyPrefix)
                 .tenantId(tenantId)
+                .ruleSetId(ruleSet.getId())
+                .ruleSetName(ruleSet.getName())
                 .createdAt(saved.getCreatedAt())
                 .expiresAt(saved.getExpiresAt())
                 .build();

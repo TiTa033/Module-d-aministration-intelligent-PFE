@@ -19,6 +19,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,12 +28,17 @@ class RuleSetServiceTest {
     @Mock private RuleSetRepository ruleSetRepository;
     @Mock private TenantRepository tenantRepository;
     @Mock private RuleSetMapper ruleSetMapper;
+    @Mock private RuleSetVersioningService ruleSetVersioningService;
 
     private RuleSetServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new RuleSetServiceImpl(ruleSetRepository, tenantRepository, ruleSetMapper);
+        service = new RuleSetServiceImpl(
+                ruleSetRepository, tenantRepository, ruleSetMapper,
+                ruleSetVersioningService);
+        doNothing().when(ruleSetVersioningService)
+                .recordSnapshot(any(), any(), any());
     }
 
     @Test

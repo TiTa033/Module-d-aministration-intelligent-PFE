@@ -1,0 +1,69 @@
+databaseChangeLog:
+  # Split into separate changeSets: nested preConditions + change in one YAML map
+  # is not reliably executed as multiple changes in Liquibase 4.x (no DDL ran, 0 rows).
+  - changeSet:
+      id: 010a-api-keys-key-prefix
+      author: rulengine
+      preConditions:
+        onFail: MARK_RAN
+        onError: MARK_RAN
+        and:
+          - tableExists:
+              tableName: api_keys
+          - not:
+              columnExists:
+                tableName: api_keys
+                columnName: key_prefix
+      changes:
+        - addColumn:
+            tableName: api_keys
+            columns:
+              - column:
+                  name: key_prefix
+                  type: varchar(16)
+
+  - changeSet:
+      id: 010b-api-keys-rule-set-id
+      author: rulengine
+      preConditions:
+        onFail: MARK_RAN
+        onError: MARK_RAN
+        and:
+          - tableExists:
+              tableName: api_keys
+          - not:
+              columnExists:
+                tableName: api_keys
+                columnName: rule_set_id
+      changes:
+        - addColumn:
+            tableName: api_keys
+            columns:
+              - column:
+                  name: rule_set_id
+                  type: bigint
+
+  - changeSet:
+      id: 010c-api-keys-rule-set-fk
+      author: rulengine
+      preConditions:
+        onFail: MARK_RAN
+        onError: MARK_RAN
+        and:
+          - tableExists:
+              tableName: api_keys
+          - columnExists:
+              tableName: api_keys
+              columnName: rule_set_id
+          - tableExists:
+              tableName: rule_sets
+          - not:
+              foreignKeyConstraintExists:
+                foreignKeyName: fk_api_keys_rule_set_id
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: api_keys
+            baseColumnNames: rule_set_id
+            referencedTableName: rule_sets
+            referencedColumnNames: id
+            constraintName: fk_api_keys_rule_set_id

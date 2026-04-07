@@ -16,10 +16,11 @@ import java.time.LocalDateTime;
 public class RuleSetVersion {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_set_seq_gen")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE,
+            generator = "rule_set_version_seq_gen")
     @SequenceGenerator(
-            name = "rule_set_seq_gen",
-            sequenceName = "rule_set_seq",
+            name = "rule_set_version_seq_gen",
+            sequenceName = "rule_set_version_seq",
             allocationSize = 1
     )
     @Column(name = "id", updatable = false, nullable = false)

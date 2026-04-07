@@ -16,4 +16,6 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long> {
 
     // Used by evaluation engine to find active keys
     List<ApiKey> findAllByTenantIdAndActiveTrue(Long tenantId);
+
+    List<ApiKey> findAllByKeyPrefixAndActiveTrue(String keyPrefix);
 }

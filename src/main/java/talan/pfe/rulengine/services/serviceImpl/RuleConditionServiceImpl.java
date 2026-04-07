@@ -16,6 +16,7 @@ import talan.pfe.rulengine.repositories.RuleConditionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.RuleConditionService;
+import talan.pfe.rulengine.services.RuleSetVersioningService;
 
 import java.util.List;
 
@@ -28,6 +29,7 @@ public class RuleConditionServiceImpl implements RuleConditionService {
     private final RuleRepository ruleRepository;
     private final RuleConditionRepository ruleConditionRepository;
     private final RuleConditionMapper ruleConditionMapper;
+    private final RuleSetVersioningService ruleSetVersioningService;
 
     @Override
     @Transactional
@@ -49,8 +51,10 @@ public class RuleConditionServiceImpl implements RuleConditionService {
                 .rule(rule)
                 .build();
 
-        return ruleConditionMapper.toDto(
-                ruleConditionRepository.save(condition));
+        RuleCondition saved = ruleConditionRepository.save(condition);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Condition added to rule " + rule.getName());
+        return ruleConditionMapper.toDto(saved);
     }
 
     @Override
@@ -95,8 +99,10 @@ public class RuleConditionServiceImpl implements RuleConditionService {
         condition.setValue(request.getValue());
         condition.setValueType(request.getValueType());
 
-        return ruleConditionMapper.toDto(
-                ruleConditionRepository.save(condition));
+        RuleCondition saved = ruleConditionRepository.save(condition);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Condition updated on rule " + rule.getName());
+        return ruleConditionMapper.toDto(saved);
     }
 
     @Override
@@ -116,6 +122,8 @@ public class RuleConditionServiceImpl implements RuleConditionService {
                         "RuleCondition not found with id: " + id));
 
         ruleConditionRepository.delete(condition);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Condition deleted on rule " + rule.getName());
     }
 
     private Rule findRuleOrThrow(Long ruleSetId, Long ruleId,

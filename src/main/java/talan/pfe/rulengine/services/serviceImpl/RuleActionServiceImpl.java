@@ -16,6 +16,7 @@ import talan.pfe.rulengine.repositories.RuleActionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.RuleActionService;
+import talan.pfe.rulengine.services.RuleSetVersioningService;
 
 import java.util.List;
 
@@ -28,6 +29,7 @@ public class RuleActionServiceImpl implements RuleActionService {
     private final RuleRepository ruleRepository;
     private final RuleActionRepository ruleActionRepository;
     private final RuleActionMapper ruleActionMapper;
+    private final RuleSetVersioningService ruleSetVersioningService;
 
     @Override
     @Transactional
@@ -48,7 +50,10 @@ public class RuleActionServiceImpl implements RuleActionService {
                 .rule(rule)
                 .build();
 
-        return ruleActionMapper.toDto(ruleActionRepository.save(action));
+        RuleAction saved = ruleActionRepository.save(action);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Action added to rule " + rule.getName());
+        return ruleActionMapper.toDto(saved);
     }
 
     @Override
@@ -91,7 +96,10 @@ public class RuleActionServiceImpl implements RuleActionService {
         action.setOutputKey(request.getOutputKey());
         action.setOutputValue(request.getOutputValue());
 
-        return ruleActionMapper.toDto(ruleActionRepository.save(action));
+        RuleAction saved = ruleActionRepository.save(action);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Action updated on rule " + rule.getName());
+        return ruleActionMapper.toDto(saved);
     }
 
     @Override
@@ -111,6 +119,8 @@ public class RuleActionServiceImpl implements RuleActionService {
                         "RuleAction not found with id: " + id));
 
         ruleActionRepository.delete(action);
+        ruleSetVersioningService.recordSnapshot(
+                ruleSetId, tenantId, "Action deleted on rule " + rule.getName());
     }
 
     private Rule findRuleOrThrow(Long ruleSetId, Long ruleId,

@@ -1,0 +1,160 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-seed-swagger-demo
+      author: demo
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - tableExists:
+            tableName: tenants
+        - tableExists:
+            tableName: users
+        - tableExists:
+            tableName: rule_sets
+        - tableExists:
+            tableName: rules
+        - tableExists:
+            tableName: rule_conditions
+        - tableExists:
+            tableName: rule_actions
+      changes:
+        - sql:
+            dbms: postgresql
+            splitStatements: true
+            stripComments: true
+            sql: |
+              -- =========================
+              -- TENANTS
+              -- =========================
+              INSERT INTO tenants (id, name, slug, status, created_at, updated_at)
+              VALUES
+                (nextval('tenant_seq'), 'Demo Tenant BNP', 'bnp', 'ACTIVE', now(), now()),
+                (nextval('tenant_seq'), 'Demo Tenant SG',  'sg',  'ACTIVE', now(), now())
+              ON CONFLICT (slug) DO NOTHING;
+
+              -- =========================
+              -- USERS (plaintext login password = password123)
+              -- BCrypt(password123) = $2a$10$Z4lwWM2slehESra3HP04c.abDAza28kgOoM4Ny2H2FjeXm.tFrlJW
+              -- =========================
+              INSERT INTO users (id, name, email, password_hash, role, tenant_id, active)
+              VALUES
+                (nextval('user_seq'), 'Global Admin', 'globaladmin@demo.com',
+                 '$2a$10$Z4lwWM2slehESra3HP04c.abDAza28kgOoM4Ny2H2FjeXm.tFrlJW',
+                 'GLOBAL_ADMIN', (SELECT id FROM tenants WHERE slug='bnp'), true),
+
+                (nextval('user_seq'), 'Admin BNP', 'admin.bnp@demo.com',
+                 '$2a$10$Z4lwWM2slehESra3HP04c.abDAza28kgOoM4Ny2H2FjeXm.tFrlJW',
+                 'ADMIN', (SELECT id FROM tenants WHERE slug='bnp'), true),
+
+                (nextval('user_seq'), 'Manager BNP', 'manager.bnp@demo.com',
+                 '$2a$10$Z4lwWM2slehESra3HP04c.abDAza28kgOoM4Ny2H2FjeXm.tFrlJW',
+                 'MANAGER', (SELECT id FROM tenants WHERE slug='bnp'), true),
+
+                (nextval('user_seq'), 'Viewer BNP', 'viewer.bnp@demo.com',
+                 '$2a$10$Z4lwWM2slehESra3HP04c.abDAza28kgOoM4Ny2H2FjeXm.tFrlJW',
+                 'VIEWER', (SELECT id FROM tenants WHERE slug='bnp'), true),
+
+                (nextval('user_seq'), 'Admin SG', 'admin.sg@demo.com',
+                 '$2a$10$Z4lwWM2slehESra3HP04c.abDAza28kgOoM4Ny2H2FjeXm.tFrlJW',
+                 'ADMIN', (SELECT id FROM tenants WHERE slug='sg'), true),
+
+                (nextval('user_seq'), 'Manager SG', 'manager.sg@demo.com',
+                 '$2a$10$Z4lwWM2slehESra3HP04c.abDAza28kgOoM4Ny2H2FjeXm.tFrlJW',
+                 'MANAGER', (SELECT id FROM tenants WHERE slug='sg'), true),
+
+                (nextval('user_seq'), 'Viewer SG', 'viewer.sg@demo.com',
+                 '$2a$10$Z4lwWM2slehESra3HP04c.abDAza28kgOoM4Ny2H2FjeXm.tFrlJW',
+                 'VIEWER', (SELECT id FROM tenants WHERE slug='sg'), true)
+              ON CONFLICT (email) DO NOTHING;
+
+              -- =========================
+              -- RULESETS + RULES + CONDITIONS + ACTIONS
+              -- =========================
+
+              -- BNP ruleset 1
+              WITH rs AS (
+                INSERT INTO rule_sets (id, tenant_id, name, description, evaluation_strategy, status, current_version, created_at, updated_at)
+                VALUES (
+                  nextval('rule_set_seq'),
+                  (SELECT id FROM tenants WHERE slug='bnp'),
+                  'BNP - Credit Decisioning',
+                  'Ruleset demo BNP',
+                  'FIRST_MATCH',
+                  'DRAFT',
+                  1,
+                  now(),
+                  now()
+                )
+                ON CONFLICT (name, tenant_id) DO UPDATE SET updated_at = now()
+                RETURNING id
+              ),
+              r1 AS (
+                INSERT INTO rules (id, rule_set_id, name, description, priority, enabled, logic_operator, score, created_at, updated_at)
+                SELECT nextval('rule_seq'), rs.id, 'High income approve', 'income >= 5000', 1, true, 'AND', 100, now(), now()
+                FROM rs
+                RETURNING id
+              ),
+              r2 AS (
+                INSERT INTO rules (id, rule_set_id, name, description, priority, enabled, logic_operator, score, created_at, updated_at)
+                SELECT nextval('rule_seq'), rs.id, 'Low income review', 'income < 2000', 2, true, 'AND', 40, now(), now()
+                FROM rs
+                RETURNING id
+              )
+              INSERT INTO rule_conditions (id, rule_id, field, operator, value, value_type)
+              SELECT nextval('rule_condition_seq'), r1.id, 'income', 'GREATER_OR_EQUAL', '5000', 'NUMBER' FROM r1
+              UNION ALL
+              SELECT nextval('rule_condition_seq'), r2.id, 'income', 'LESS_THAN', '2000', 'NUMBER' FROM r2;
+
+              WITH rs AS (
+                SELECT id FROM rule_sets WHERE name='BNP - Credit Decisioning'
+                  AND tenant_id = (SELECT id FROM tenants WHERE slug='bnp')
+                LIMIT 1
+              ),
+              r AS (
+                SELECT id, priority FROM rules WHERE rule_set_id = (SELECT id FROM rs)
+              )
+              INSERT INTO rule_actions (id, rule_id, action_type, output_key, output_value)
+              SELECT nextval('rule_action_seq'), r.id,
+                     CASE WHEN r.priority = 1 THEN 'APPROVE' ELSE 'REQUIRE_REVIEW' END,
+                     'decision',
+                     CASE WHEN r.priority = 1 THEN 'APPROVED' ELSE 'REVIEW' END
+              FROM r;
+
+              -- SG ruleset 1
+              WITH rs AS (
+                INSERT INTO rule_sets (id, tenant_id, name, description, evaluation_strategy, status, current_version, created_at, updated_at)
+                VALUES (
+                  nextval('rule_set_seq'),
+                  (SELECT id FROM tenants WHERE slug='sg'),
+                  'SG - Fraud Screening',
+                  'Ruleset demo SG',
+                  'FIRST_MATCH',
+                  'DRAFT',
+                  1,
+                  now(),
+                  now()
+                )
+                ON CONFLICT (name, tenant_id) DO UPDATE SET updated_at = now()
+                RETURNING id
+              ),
+              r1 AS (
+                INSERT INTO rules (id, rule_set_id, name, description, priority, enabled, logic_operator, score, created_at, updated_at)
+                SELECT nextval('rule_seq'), rs.id, 'Flag risky country', 'country in list', 1, true, 'AND', 80, now(), now()
+                FROM rs
+                RETURNING id
+              )
+              INSERT INTO rule_conditions (id, rule_id, field, operator, value, value_type)
+              SELECT nextval('rule_condition_seq'), r1.id, 'country', 'IN_LIST', 'IR,RU,KP', 'STRING' FROM r1;
+
+              WITH rs AS (
+                SELECT id FROM rule_sets WHERE name='SG - Fraud Screening'
+                  AND tenant_id = (SELECT id FROM tenants WHERE slug='sg')
+                LIMIT 1
+              ),
+              r AS (
+                SELECT id FROM rules WHERE rule_set_id = (SELECT id FROM rs) LIMIT 1
+              )
+              INSERT INTO rule_actions (id, rule_id, action_type, output_key, output_value)
+              SELECT nextval('rule_action_seq'), r.id, 'SET_FLAG', 'isFraudRisk', 'true'
+              FROM r;
+

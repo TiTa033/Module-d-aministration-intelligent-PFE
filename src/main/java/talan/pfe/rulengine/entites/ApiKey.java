@@ -25,6 +25,10 @@ public class ApiKey {
     @Column(name = "key_hash", nullable = false, unique = true)
     private String keyHash;
 
+    /** First characters of the raw key for lookup (BCrypt verify on candidates). */
+    @Column(name = "key_prefix", length = 16)
+    private String keyPrefix;
+
     @Column(name = "name", nullable = false)
     private String name;
 
@@ -40,6 +44,10 @@ public class ApiKey {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rule_set_id")
+    private RuleSet ruleSet;
 
     @PrePersist
     protected void onCreate() {

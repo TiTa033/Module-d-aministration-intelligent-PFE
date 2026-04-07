@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Rulengine — Playground /evaluate</title>
+  <style>
+    :root {
+      font-family: system-ui, sans-serif;
+      color: #0f172a;
+      background: #f8fafc;
+      --card: #ffffff;
+      --border: #111827;
+      --muted: #475569;
+      --primary: #2563eb;
+      --primaryHover: #1d4ed8;
+      --danger: #b91c1c;
+      --dangerBg: #fef2f2;
+      --okBg: #f0fdf4;
+      --shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+    }
+    body { max-width: 1080px; margin: 0 auto; padding: 1.5rem; }
+    h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+    .sub { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 1rem; margin-top: 1rem; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .cardHead {
+      padding: 0.85rem 1rem;
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .cardBody { padding: 1rem; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      border: 2px solid var(--border);
+      background: #fff;
+      font-size: 0.8rem;
+      color: #111827;
+      white-space: nowrap;
+    }
+    .pill b { font-weight: 700; }
+    label { display: block; margin-top: 0.75rem; font-size: 0.85rem; font-weight: 600; color: #111827; }
+    .hint { font-size: 0.8rem; color: var(--muted); margin-top: 0.35rem; }
+    input, select, textarea, button {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 0.35rem;
+      padding: 0.55rem 0.7rem;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.92rem;
+      background: #fff;
+      color: #0f172a;
+    }
+    textarea { font-family: ui-monospace, monospace; min-height: 220px; line-height: 1.45; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+    .actions { display: flex; gap: 0.75rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; }
+    button {
+      width: auto;
+      cursor: pointer;
+      background: var(--primary);
+      color: #fff;
+      border: 2px solid var(--border);
+      padding: 0.6rem 1.2rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    button:hover { background: var(--primaryHover); }
+    button.secondary {
+      background: #fff;
+      color: #111827;
+    }
+    button.secondary:hover {
+      background: #f1f5f9;
+    }
+    .statusBox {
+      margin-top: 0.75rem;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem;
+      background: #fff;
+      color: #111827;
+      font-size: 0.9rem;
+    }
+    .statusBox.err { border-color: var(--danger); background: var(--dangerBg); color: var(--danger); }
+    .statusBox.ok  { border-color: #166534; background: var(--okBg); color: #166534; }
+    pre {
+      margin: 0;
+      padding: 1rem;
+      background: #0b1020;
+      color: #e2e8f0;
+      border-top: 2px solid var(--border);
+      overflow: auto;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      min-height: 260px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    code { font-family: ui-monospace, monospace; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="cardHead">
+      <div>
+        <h1>Rulengine Playground</h1>
+        <p class="sub">POST <code>/api/evaluate</code> (le RuleSet est déduit de la clé API)</p>
+      </div>
+      <div class="pill"><b>Validation</b> champs + types</div>
+    </div>
+    <div class="cardBody">
+      <div class="row">
+        <div>
+          <label>Base URL</label>
+          <input id="baseUrl" type="text" value="http://localhost:8085"/>
+          <div class="hint">Ex: <code>http://localhost:8085</code></div>
+        </div>
+        <div>
+          <label>RuleSet (auto)</label>
+          <input id="ruleSetInfo" type="text" value="(sera affiché après une exécution)" disabled/>
+          <div class="hint">Le backend lit la strategy depuis le RuleSet lié à la clé API.</div>
+        </div>
+      </div>
+
+      <label>X-API-Key</label>
+      <input id="apiKey" type="password" autocomplete="off" placeholder="raas_..."/>
+      <div class="hint">Cette clé doit être générée et liée à un RuleSet.</div>
+
+      <label>Payload JSON (corps) — champ <code>input</code></label>
+      <textarea id="inputJson" spellcheck="false">{
+  "amount": 1500,
+  "country": "FR"
+}</textarea>
+      <div class="hint">
+        Erreurs possibles: <code>Unknown field(s)</code>, <code>Missing field(s)</code>, <code>Invalid input type(s)</code>.
+      </div>
+
+      <div class="actions">
+        <button type="button" id="run">Exécuter</button>
+        <button type="button" id="format" class="secondary">Formatter JSON</button>
+        <span id="status" class="statusBox" style="display:none"></span>
+      </div>
+    </div>
+    <pre id="out">(vide)</pre>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const baseKey = 'Rulengine_playground_api_key';
+    $('apiKey').value = localStorage.getItem(baseKey) || '';
+
+    function setStatus(kind, text) {
+      const el = $('status');
+      if (!text) {
+        el.style.display = 'none';
+        el.textContent = '';
+        el.className = 'statusBox';
+        return;
+      }
+      el.style.display = 'inline-block';
+      el.textContent = text;
+      el.className = 'statusBox ' + (kind || '');
+    }
+
+    $('format').onclick = () => {
+      try {
+        const obj = JSON.parse($('inputJson').value);
+        $('inputJson').value = JSON.stringify(obj, null, 2);
+        setStatus('ok', 'JSON formaté.');
+      } catch (e) {
+        setStatus('err', 'JSON invalide: ' + e.message);
+      }
+    };
+
+    $('run').onclick = async () => {
+      const base = $('baseUrl').value.replace(/\/$/, '');
+      const key = $('apiKey').value.trim();
+      if (key) localStorage.setItem(baseKey, key);
+
+      let inputObj;
+      try {
+        inputObj = JSON.parse($('inputJson').value);
+      } catch (e) {
+        setStatus('err', 'JSON invalide: ' + e.message);
+        $('out').textContent = '(vide)';
+        return;
+      }
+
+      const body = { input: inputObj };
+      $('ruleSetInfo').value = '(chargement...)';
+
+      setStatus('', '');
+      $('out').textContent = 'Chargement…';
+      try {
+        const res = await fetch(base + '/api/evaluate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': key
+          },
+          body: JSON.stringify(body)
+        });
+        const text = await res.text();
+        let json = null;
+        try { json = JSON.parse(text); } catch (_) {}
+        const pretty = json ? JSON.stringify(json, null, 2) : text;
+        const ok = res.status >= 200 && res.status < 300;
+        setStatus(ok ? 'ok' : 'err', res.status + ' ' + res.statusText);
+
+        if (ok && json) {
+          const rsName = json.ruleSetName || '(sans nom)';
+          const rsId = (json.ruleSetId !== undefined && json.ruleSetId !== null) ? json.ruleSetId : '?';
+          const stratUsed = json.strategyUsed || '?';
+          $('ruleSetInfo').value = `${rsName} (id=${rsId}) — strategy=${stratUsed}`;
+        } else {
+          $('ruleSetInfo').value = '(indisponible)';
+        }
+        $('out').textContent = pretty;
+      } catch (e) {
+        setStatus('err', 'Erreur réseau: ' + e.message);
+        $('ruleSetInfo').value = '(indisponible)';
+        $('out').textContent = '(vide)';
+      }
+    };
+  </script>
+</body>
+</html>
