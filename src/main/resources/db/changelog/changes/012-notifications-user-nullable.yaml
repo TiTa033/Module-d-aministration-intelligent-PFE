@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-notifications-user-nullable
+      author: rulengine
+      changes:
+        - sql:
+            dbms: postgresql
+            sql: |
+              ALTER TABLE notifications ALTER COLUMN user_id DROP NOT NULL;

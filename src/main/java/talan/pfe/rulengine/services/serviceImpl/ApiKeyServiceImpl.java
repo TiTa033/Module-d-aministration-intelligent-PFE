@@ -10,12 +10,17 @@ import talan.pfe.rulengine.dtos.response.ApiKeyResponse;
 import talan.pfe.rulengine.entites.ApiKey;
 import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.entites.Tenant;
+import talan.pfe.rulengine.enums.AuditAction;
+import talan.pfe.rulengine.enums.NotifType;
 import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
+import talan.pfe.rulengine.kafka.AuditProducer;
+import talan.pfe.rulengine.kafka.NotificationProducer;
 import talan.pfe.rulengine.mappers.ApiKeyMapper;
 import talan.pfe.rulengine.repositories.ApiKeyRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.repositories.TenantRepository;
+import talan.pfe.rulengine.security.CurrentUserResolver;
 import talan.pfe.rulengine.services.ApiKeyService;
 
 import java.security.SecureRandom;
@@ -32,16 +37,17 @@ public class ApiKeyServiceImpl implements ApiKeyService {
     private final RuleSetRepository ruleSetRepository;
     private final ApiKeyMapper apiKeyMapper;
     private final PasswordEncoder passwordEncoder;
+    private final AuditProducer auditProducer;
+    private final CurrentUserResolver currentUserResolver;
+    private final NotificationProducer notificationProducer;
 
     private static final String KEY_PREFIX = "raas_";
     private static final int KEY_BYTES = 32;
 
     // ─── GENERATE ───────────────────────────────────────────
-
     @Override
     @Transactional
-    public ApiKeyCreatedResponse generate(CreateApiKeyRequest request,
-                                          Long tenantId) {
+    public ApiKeyCreatedResponse generate(CreateApiKeyRequest request, Long tenantId) {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Tenant not found with id: " + tenantId));
@@ -67,6 +73,11 @@ public class ApiKeyServiceImpl implements ApiKeyService {
 
         ApiKey saved = apiKeyRepository.save(apiKey);
 
+        auditProducer.publish(
+                AuditAction.APIKEY_CREATED, "APIKEY", saved.getId(),
+                null, saved.getName(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
         return ApiKeyCreatedResponse.builder()
                 .id(saved.getId())
                 .name(saved.getName())
@@ -84,8 +95,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
     @Override
     public List<ApiKeyResponse> getAll(Long tenantId) {
         return apiKeyMapper.toDtoList(
-                apiKeyRepository.findAllByTenantIdOrderByCreatedAtDesc(
-                        tenantId));
+                apiKeyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId));
     }
 
     // ─── GET BY ID ──────────────────────────────────────────
@@ -105,7 +115,18 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         }
 
         apiKey.setActive(false);
-        return apiKeyMapper.toDto(apiKeyRepository.save(apiKey));
+        ApiKeyResponse saved = apiKeyMapper.toDto(apiKeyRepository.save(apiKey));
+
+        auditProducer.publish(
+                AuditAction.APIKEY_REVOKED, "APIKEY", id,
+                null, apiKey.getName(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+        notificationProducer.publish(
+                "Clé API révoquée",
+                "La clé API '" + apiKey.getName() + "' a été révoquée",
+                NotifType.ERROR, tenantId, id, "APIKEY");
+
+        return saved;
     }
 
     // ─── REGENERATE ─────────────────────────────────────────
@@ -118,7 +139,6 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         String keyHash = passwordEncoder.encode(rawKey);
         String keyPrefix = rawKey.substring(0, 12);
 
-        // Revoke old key and issue new one with same name
         apiKey.setActive(false);
         apiKeyRepository.save(apiKey);
 
@@ -136,6 +156,11 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                 .build();
 
         ApiKey saved = apiKeyRepository.save(newApiKey);
+
+        auditProducer.publish(
+                AuditAction.APIKEY_REGENERATED, "APIKEY", saved.getId(),
+                apiKey.getName(), saved.getName(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
 
         return ApiKeyCreatedResponse.builder()
                 .id(saved.getId())
@@ -161,6 +186,11 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                     "Cannot delete an active API Key. Revoke it first.");
         }
 
+        auditProducer.publish(
+                AuditAction.APIKEY_DELETED, "APIKEY", id,
+                apiKey.getName(), null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
         apiKeyRepository.delete(apiKey);
     }
 
@@ -180,5 +210,4 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                 .encodeToString(bytes);
         return KEY_PREFIX + encoded;
     }
-
 }

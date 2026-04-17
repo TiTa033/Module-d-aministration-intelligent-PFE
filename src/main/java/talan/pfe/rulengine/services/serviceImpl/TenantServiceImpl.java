@@ -8,10 +8,13 @@ import talan.pfe.rulengine.dtos.request.*;
 import talan.pfe.rulengine.dtos.response.PageResponse;
 import talan.pfe.rulengine.dtos.response.TenantResponse;
 import talan.pfe.rulengine.entites.Tenant;
+import talan.pfe.rulengine.enums.AuditAction;
 import talan.pfe.rulengine.enums.TenantStatus;
 import talan.pfe.rulengine.exception.*;
+import talan.pfe.rulengine.kafka.AuditProducer;
 import talan.pfe.rulengine.mappers.TenantMapper;
 import talan.pfe.rulengine.repositories.TenantRepository;
+import talan.pfe.rulengine.security.CurrentUserResolver;
 import talan.pfe.rulengine.services.TenantService;
 
 @Service
@@ -21,6 +24,8 @@ public class TenantServiceImpl implements TenantService {
 
     private final TenantRepository tenantRepository;
     private final TenantMapper tenantMapper;
+    private final AuditProducer auditProducer;
+    private final CurrentUserResolver currentUserResolver;
 
     // ─── CREATE ─────────────────────────────────────────────
     @Override
@@ -36,7 +41,14 @@ public class TenantServiceImpl implements TenantService {
                 .slug(request.getSlug())
                 .build();
 
-        return tenantMapper.toDto(tenantRepository.save(tenant));
+        TenantResponse saved = tenantMapper.toDto(tenantRepository.save(tenant));
+
+        auditProducer.publish(
+                AuditAction.TENANT_CREATED, "TENANT", saved.getId(),
+                null, saved.getName(),
+                null, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     // ─── GET BY ID ──────────────────────────────────────────
@@ -50,8 +62,8 @@ public class TenantServiceImpl implements TenantService {
     }
 
     // ─── GET ALL ────────────────────────────────────────────
-   @Override
-   public PageResponse<TenantResponse> getAll(
+    @Override
+    public PageResponse<TenantResponse> getAll(
             String search, String status,
             int page, int size,
             String sortBy, String sortDir) {
@@ -78,8 +90,7 @@ public class TenantServiceImpl implements TenantService {
                 .findAllWithFilters(searchParam, tenantStatus, pageable)
                 .map(tenant -> {
                     long totalUsers =
-                            tenantRepository.countUsersByTenantId(
-                                    tenant.getId());
+                            tenantRepository.countUsersByTenantId(tenant.getId());
                     TenantResponse response = tenantMapper.toDto(tenant);
                     response.setTotalUsers(totalUsers);
                     return response;
@@ -93,8 +104,16 @@ public class TenantServiceImpl implements TenantService {
     @Transactional
     public TenantResponse update(Long id, UpdateTenantRequest request) {
         Tenant tenant = findOrThrow(id);
+        String oldName = tenant.getName();
         tenant.setName(request.getName());
-        return tenantMapper.toDto(tenantRepository.save(tenant));
+        TenantResponse saved = tenantMapper.toDto(tenantRepository.save(tenant));
+
+        auditProducer.publish(
+                AuditAction.TENANT_UPDATED, "TENANT", id,
+                oldName, saved.getName(),
+                null, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     // ─── ACTIVATE ───────────────────────────────────────────
@@ -106,7 +125,14 @@ public class TenantServiceImpl implements TenantService {
             throw new BadRequestException("Tenant is already active");
         }
         tenant.setStatus(TenantStatus.ACTIVE);
-        return tenantMapper.toDto(tenantRepository.save(tenant));
+        TenantResponse saved = tenantMapper.toDto(tenantRepository.save(tenant));
+
+        auditProducer.publish(
+                AuditAction.TENANT_ACTIVATED, "TENANT", id,
+                null, null,
+                null, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     // ─── DEACTIVATE ─────────────────────────────────────────
@@ -118,7 +144,14 @@ public class TenantServiceImpl implements TenantService {
             throw new BadRequestException("Tenant is already inactive");
         }
         tenant.setStatus(TenantStatus.INACTIVE);
-        return tenantMapper.toDto(tenantRepository.save(tenant));
+        TenantResponse saved = tenantMapper.toDto(tenantRepository.save(tenant));
+
+        auditProducer.publish(
+                AuditAction.TENANT_DEACTIVATED, "TENANT", id,
+                null, null,
+                null, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     // ─── DELETE ─────────────────────────────────────────────
@@ -132,10 +165,16 @@ public class TenantServiceImpl implements TenantService {
                     "Cannot delete tenant with " + totalUsers +
                             " active users. Deactivate all users first.");
         }
+
+        auditProducer.publish(
+                AuditAction.TENANT_DELETED, "TENANT", id,
+                tenant.getName(), null,
+                null, currentUserResolver.getCurrentUserId(), null);
+
         tenantRepository.delete(tenant);
     }
 
-    // ─── PRIVATE HELPER ─────────────────────────────────────
+    // ─── PRIVATE HELPERS ────────────────────────────────────
     private Tenant findOrThrow(Long id) {
         return tenantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(

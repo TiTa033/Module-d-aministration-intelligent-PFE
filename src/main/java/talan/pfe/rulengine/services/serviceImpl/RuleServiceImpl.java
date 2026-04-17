@@ -9,13 +9,17 @@ import talan.pfe.rulengine.dtos.response.PageResponse;
 import talan.pfe.rulengine.dtos.response.RuleResponse;
 import talan.pfe.rulengine.entites.Rule;
 import talan.pfe.rulengine.entites.RuleSet;
+import talan.pfe.rulengine.enums.AuditAction;
+import talan.pfe.rulengine.enums.NotifType;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 import talan.pfe.rulengine.exception.*;
+import talan.pfe.rulengine.kafka.AuditProducer;
+import talan.pfe.rulengine.kafka.NotificationProducer;
 import talan.pfe.rulengine.mappers.RuleMapper;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
+import talan.pfe.rulengine.security.CurrentUserResolver;
 import talan.pfe.rulengine.services.RuleService;
-import talan.pfe.rulengine.services.RuleSetVersioningService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,28 +32,26 @@ public class RuleServiceImpl implements RuleService {
     private final RuleRepository ruleRepository;
     private final RuleSetRepository ruleSetRepository;
     private final RuleMapper ruleMapper;
-    private final RuleSetVersioningService ruleSetVersioningService;
+    private final AuditProducer auditProducer;
+    private final CurrentUserResolver currentUserResolver;
+    private final NotificationProducer notificationProducer;
 
     @Override
     @Transactional
-    public RuleResponse create(Long ruleSetId, Long tenantId,
-                               CreateRuleRequest request) {
+    public RuleResponse create(Long ruleSetId, Long tenantId, CreateRuleRequest request) {
         RuleSet ruleSet = findRuleSetOrThrow(ruleSetId, tenantId);
 
         if (ruleSet.getStatus() == RuleSetStatus.ARCHIVED) {
-            throw new BadRequestException(
-                    "Cannot add rules to an archived RuleSet");
+            throw new BadRequestException("Cannot add rules to an archived RuleSet");
         }
 
-        if (ruleRepository.existsByNameAndRuleSetId(
-                request.getName(), ruleSetId)) {
+        if (ruleRepository.existsByNameAndRuleSetId(request.getName(), ruleSetId)) {
             throw new ConflictException(
                     "A Rule with name '" + request.getName() +
                             "' already exists in this RuleSet");
         }
 
-        if (ruleRepository.existsByPriorityAndRuleSetId(
-                request.getPriority(), ruleSetId)) {
+        if (ruleRepository.existsByPriorityAndRuleSetId(request.getPriority(), ruleSetId)) {
             throw new ConflictException(
                     "A Rule with priority " + request.getPriority() +
                             " already exists in this RuleSet");
@@ -64,10 +66,14 @@ public class RuleServiceImpl implements RuleService {
                 .ruleSet(ruleSet)
                 .build();
 
-        Rule saved = ruleRepository.save(rule);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Rule created: " + saved.getName());
-        return ruleMapper.toDto(saved);
+        RuleResponse saved = ruleMapper.toDto(ruleRepository.save(rule));
+
+        auditProducer.publish(
+                AuditAction.RULE_CREATED, "RULE", saved.getId(),
+                null, saved.getName(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     @Override
@@ -76,8 +82,7 @@ public class RuleServiceImpl implements RuleService {
 
         findRuleSetOrThrow(ruleSetId, tenantId);
 
-        String searchParam = (filter.getSearch() == null)
-                ? "" : filter.getSearch();
+        String searchParam = (filter.getSearch() == null) ? "" : filter.getSearch();
 
         Boolean enabledParam = null;
         if (filter.getEnabled() != null && !filter.getEnabled().isBlank()) {
@@ -88,12 +93,10 @@ public class RuleServiceImpl implements RuleService {
                 ? Sort.by(filter.getSortBy()).descending()
                 : Sort.by(filter.getSortBy()).ascending();
 
-        Pageable pageable = PageRequest.of(
-                filter.getPage(), filter.getSize(), sort);
+        Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
 
         Page<RuleResponse> resultPage = ruleRepository
-                .findAllByRuleSetWithFilters(
-                        ruleSetId, searchParam, enabledParam, pageable)
+                .findAllByRuleSetWithFilters(ruleSetId, searchParam, enabledParam, pageable)
                 .map(ruleMapper::toDto);
 
         return PageResponse.from(resultPage);
@@ -119,8 +122,7 @@ public class RuleServiceImpl implements RuleService {
         RuleSet ruleSet = findRuleSetOrThrow(ruleSetId, tenantId);
 
         if (ruleSet.getStatus() == RuleSetStatus.ARCHIVED) {
-            throw new BadRequestException(
-                    "Cannot update rules in an archived RuleSet");
+            throw new BadRequestException("Cannot update rules in an archived RuleSet");
         }
 
         Rule rule = findRuleOrThrow(id, ruleSetId);
@@ -139,16 +141,21 @@ public class RuleServiceImpl implements RuleService {
                             " already exists in this RuleSet");
         }
 
+        String oldName = rule.getName();
         rule.setName(request.getName());
         rule.setDescription(request.getDescription());
         rule.setPriority(request.getPriority());
         rule.setLogicOperator(request.getLogicOperator());
         rule.setScore(request.getScore());
 
-        Rule saved = ruleRepository.save(rule);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Rule updated: " + saved.getName());
-        return ruleMapper.toDto(saved);
+        RuleResponse saved = ruleMapper.toDto(ruleRepository.save(rule));
+
+        auditProducer.publish(
+                AuditAction.RULE_UPDATED, "RULE", id,
+                oldName, saved.getName(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     @Override
@@ -161,16 +168,22 @@ public class RuleServiceImpl implements RuleService {
             throw new BadRequestException("Rule is already enabled");
         }
 
-        rule.setEnabled(true);
-        Rule saved = ruleRepository.save(rule);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Rule enabled: " + saved.getName());
-        return ruleMapper.toDto(saved);
         rule.setPendingEnabled(true);
-        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+        rule.setActivationDate(
+                LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
-        return ruleMapper.toDto(ruleRepository.save(rule));
- 
+        RuleResponse saved = ruleMapper.toDto(ruleRepository.save(rule));
+
+        auditProducer.publish(
+                AuditAction.RULE_ENABLED, "RULE", id,
+                null, null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+        notificationProducer.publish(
+                "Règle activée",
+                "La règle '" + rule.getName() + "' sera activée demain à minuit",
+                NotifType.INFO, tenantId, id, "RULE");
+
+        return saved;
     }
 
     @Override
@@ -183,15 +196,22 @@ public class RuleServiceImpl implements RuleService {
             throw new BadRequestException("Rule is already disabled");
         }
 
-        rule.setEnabled(false);
-        Rule saved = ruleRepository.save(rule);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Rule disabled: " + saved.getName());
-        return ruleMapper.toDto(saved);
         rule.setPendingEnabled(false);
-        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+        rule.setActivationDate(
+                LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
-        return ruleMapper.toDto(ruleRepository.save(rule));
+        RuleResponse saved = ruleMapper.toDto(ruleRepository.save(rule));
+
+        auditProducer.publish(
+                AuditAction.RULE_DISABLED, "RULE", id,
+                null, null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+        notificationProducer.publish(
+                "Règle désactivée",
+                "La règle '" + rule.getName() + "' sera désactivée demain à minuit",
+                NotifType.WARNING, tenantId, id, "RULE");
+
+        return saved;
     }
 
     @Override
@@ -204,11 +224,14 @@ public class RuleServiceImpl implements RuleService {
                     "Cannot delete rules from an archived RuleSet");
         }
 
-        Rule existing = findRuleOrThrow(id, ruleSetId);
-        String name = existing.getName();
-        ruleRepository.delete(existing);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Rule deleted: " + name);
+        Rule rule = findRuleOrThrow(id, ruleSetId);
+
+        auditProducer.publish(
+                AuditAction.RULE_DELETED, "RULE", id,
+                rule.getName(), null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        ruleRepository.delete(rule);
     }
 
     private RuleSet findRuleSetOrThrow(Long ruleSetId, Long tenantId) {

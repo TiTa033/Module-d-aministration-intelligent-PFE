@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-update-audit-action-check
+      author: rulengine
+      changes:
+        - sql:
+            dbms: postgresql
+            sql: |
+              ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_action_check;
+
+              ALTER TABLE audit_logs ADD CONSTRAINT audit_logs_action_check
+              CHECK (action IN (
+                'TENANT_CREATED', 'TENANT_UPDATED', 'TENANT_ACTIVATED',
+                'TENANT_DEACTIVATED', 'TENANT_DELETED',
+                'USER_CREATED', 'USER_UPDATED', 'USER_ROLE_CHANGED',
+                'USER_ACTIVATED', 'USER_DEACTIVATED', 'USER_DELETED',
+                'APIKEY_CREATED', 'APIKEY_REVOKED', 'APIKEY_REGENERATED', 'APIKEY_DELETED',
+                'RULESET_CREATED', 'RULESET_UPDATED', 'RULESET_ACTIVATED',
+                'RULESET_ARCHIVED', 'RULESET_UNARCHIVED', 'RULESET_MOVED_TO_DRAFT',
+                'RULESET_DELETED',
+                'RULE_CREATED', 'RULE_UPDATED', 'RULE_ENABLED', 'RULE_DISABLED',
+                'RULE_DELETED',
+                'CONDITION_CREATED', 'CONDITION_UPDATED', 'CONDITION_DELETED',
+                'ACTION_CREATED', 'ACTION_UPDATED', 'ACTION_DELETED',
+                'VERSION_CREATED', 'ROLLBACK_PERFORMED',
+                'CONFIG_IMPORTED', 'CONFIG_EXPORTED',
+                'RULESET_EVALUATED',
+                'INSIGHT_ACCEPTED', 'INSIGHT_REJECTED'
+              ));

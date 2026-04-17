@@ -8,15 +8,17 @@ import talan.pfe.rulengine.dtos.response.RuleConditionResponse;
 import talan.pfe.rulengine.entites.Rule;
 import talan.pfe.rulengine.entites.RuleCondition;
 import talan.pfe.rulengine.entites.RuleSet;
+import talan.pfe.rulengine.enums.AuditAction;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
+import talan.pfe.rulengine.kafka.AuditProducer;
 import talan.pfe.rulengine.mappers.RuleConditionMapper;
 import talan.pfe.rulengine.repositories.RuleConditionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
+import talan.pfe.rulengine.security.CurrentUserResolver;
 import talan.pfe.rulengine.services.RuleConditionService;
-import talan.pfe.rulengine.services.RuleSetVersioningService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,13 +32,13 @@ public class RuleConditionServiceImpl implements RuleConditionService {
     private final RuleRepository ruleRepository;
     private final RuleConditionRepository ruleConditionRepository;
     private final RuleConditionMapper ruleConditionMapper;
-    private final RuleSetVersioningService ruleSetVersioningService;
+    private final AuditProducer auditProducer;
+    private final CurrentUserResolver currentUserResolver;
 
     @Override
     @Transactional
     public RuleConditionResponse create(Long ruleSetId, Long ruleId,
-                                        Long tenantId,
-                                        RuleConditionRequest request) {
+                                        Long tenantId, RuleConditionRequest request) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
 
         if (rule.getRuleSet().getStatus() == RuleSetStatus.ARCHIVED) {
@@ -52,21 +54,24 @@ public class RuleConditionServiceImpl implements RuleConditionService {
                 .rule(rule)
                 .build();
 
-        RuleCondition saved = ruleConditionRepository.save(condition);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Condition added to rule " + rule.getName());
-        return ruleConditionMapper.toDto(saved);
         rule.setPendingUpdate(true);
-        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+        rule.setActivationDate(
+                LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
-        return ruleConditionMapper.toDto(
+        RuleConditionResponse saved = ruleConditionMapper.toDto(
                 ruleConditionRepository.save(condition));
+
+        auditProducer.publish(
+                AuditAction.CONDITION_CREATED, "CONDITION", saved.getId(),
+                null, request.getField() + " " + request.getOperator() + " " + request.getValue(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     @Override
     @Transactional
-    public List<RuleConditionResponse> getAll(Long ruleSetId, Long ruleId,
-                                              Long tenantId) {
+    public List<RuleConditionResponse> getAll(Long ruleSetId, Long ruleId, Long tenantId) {
         findRuleOrThrow(ruleSetId, ruleId, tenantId);
         return ruleConditionMapper.toDtoList(
                 ruleConditionRepository.findAllByRuleIdOrderByIdAsc(ruleId));
@@ -100,23 +105,33 @@ public class RuleConditionServiceImpl implements RuleConditionService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleCondition not found with id: " + id));
 
+        String oldValue = condition.getField() + " " + condition.getOperator()
+                + " " + condition.getValue();
+
         condition.setField(request.getField());
         condition.setOperator(request.getOperator());
         condition.setValue(request.getValue());
         condition.setValueType(request.getValueType());
-        rule.setPendingUpdate(true);
-        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
-        RuleCondition saved = ruleConditionRepository.save(condition);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Condition updated on rule " + rule.getName());
-        return ruleConditionMapper.toDto(saved);
+        rule.setPendingUpdate(true);
+        rule.setActivationDate(
+                LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+
+        RuleConditionResponse saved = ruleConditionMapper.toDto(
+                ruleConditionRepository.save(condition));
+
+        auditProducer.publish(
+                AuditAction.CONDITION_UPDATED, "CONDITION", id,
+                oldValue,
+                request.getField() + " " + request.getOperator() + " " + request.getValue(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     @Override
     @Transactional
-    public void delete(Long ruleSetId, Long ruleId,
-                       Long id, Long tenantId) {
+    public void delete(Long ruleSetId, Long ruleId, Long id, Long tenantId) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
 
         if (rule.getRuleSet().getStatus() == RuleSetStatus.ARCHIVED) {
@@ -130,15 +145,20 @@ public class RuleConditionServiceImpl implements RuleConditionService {
                         "RuleCondition not found with id: " + id));
 
         rule.setPendingUpdate(true);
-        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+        rule.setActivationDate(
+                LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+
+        auditProducer.publish(
+                AuditAction.CONDITION_DELETED, "CONDITION", id,
+                condition.getField() + " " + condition.getOperator()
+                        + " " + condition.getValue(),
+                null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
 
         ruleConditionRepository.delete(condition);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Condition deleted on rule " + rule.getName());
     }
 
-    private Rule findRuleOrThrow(Long ruleSetId, Long ruleId,
-                                 Long tenantId) {
+    private Rule findRuleOrThrow(Long ruleSetId, Long ruleId, Long tenantId) {
         RuleSet ruleSet = ruleSetRepository
                 .findByIdAndTenantId(ruleSetId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(

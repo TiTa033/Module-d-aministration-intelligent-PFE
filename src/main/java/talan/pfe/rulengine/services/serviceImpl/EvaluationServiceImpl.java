@@ -10,16 +10,16 @@ import org.springframework.transaction.annotation.Transactional;
 import talan.pfe.rulengine.dtos.request.EvaluateRequest;
 import talan.pfe.rulengine.dtos.response.EvaluateResponse;
 import talan.pfe.rulengine.entites.*;
-import talan.pfe.rulengine.enums.DataType;
-import talan.pfe.rulengine.enums.EvaluationStrategy;
-import talan.pfe.rulengine.enums.LogicOperator;
-import talan.pfe.rulengine.enums.RuleSetStatus;
+import talan.pfe.rulengine.enums.*;
 import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
+import talan.pfe.rulengine.kafka.AuditProducer;
+import talan.pfe.rulengine.kafka.NotificationProducer;
 import talan.pfe.rulengine.repositories.ApiKeyRepository;
 import talan.pfe.rulengine.repositories.EvaluationRequestRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.security.ApiClientPrincipal;
+import talan.pfe.rulengine.security.CurrentUserResolver;
 import talan.pfe.rulengine.services.EvaluationService;
 import talan.pfe.rulengine.util.InputFieldPath;
 
@@ -33,6 +33,9 @@ public class EvaluationServiceImpl implements EvaluationService {
     private final ApiKeyRepository apiKeyRepository;
     private final EvaluationRequestRepository evaluationRequestRepository;
     private final ObjectMapper objectMapper;
+    private final AuditProducer auditProducer;
+    private final CurrentUserResolver currentUserResolver;
+    private final NotificationProducer notificationProducer;
 
     @Override
     @Transactional
@@ -112,6 +115,13 @@ public class EvaluationServiceImpl implements EvaluationService {
         evalRequest.setResult(result);
 
         EvaluationRequest saved = evaluationRequestRepository.save(evalRequest);
+        notificationProducer.publish(
+                "Évaluation terminée",
+                "RuleSet '" + ruleSet.getName() + "' — " + applied.size() + " règle(s) matchée(s)",
+                NotifType.INFO,
+                ruleSet.getTenant().getId(),
+                saved.getId(),
+                "EVALUATION");
 
         return EvaluateResponse.builder()
                 .evaluationRequestId(saved.getId())

@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-notifications-type-check
+      author: rulengine
+      changes:
+        - sql:
+            dbms: postgresql
+            sql: |
+              ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+
+              ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
+              CHECK (type IN ('INFO', 'WARNING', 'SUCCESS', 'ERROR'));

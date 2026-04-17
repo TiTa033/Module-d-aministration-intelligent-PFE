@@ -31,4 +31,11 @@ public class CurrentUserResolver {
         return userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new BadRequestException("User not found"));
     }
+    public Long getCurrentUserId() {
+        try {
+            return requireUser().getId();
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }

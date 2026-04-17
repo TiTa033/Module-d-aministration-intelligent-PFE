@@ -1,42 +1,63 @@
 package talan.pfe.rulengine.enums;
+
 public enum AuditAction {
-    // Tenant actions
+    // Tenant
     TENANT_CREATED,
+    TENANT_UPDATED,
     TENANT_ACTIVATED,
     TENANT_DEACTIVATED,
+    TENANT_DELETED,
 
-    // User actions
+    // User
     USER_CREATED,
     USER_UPDATED,
+    USER_ROLE_CHANGED,
+    USER_ACTIVATED,
     USER_DEACTIVATED,
+    USER_DELETED,
 
-    // ApiKey actions
+    // ApiKey
     APIKEY_CREATED,
     APIKEY_REVOKED,
+    APIKEY_REGENERATED,
+    APIKEY_DELETED,
 
-    // RuleSet actions
+    // RuleSet
     RULESET_CREATED,
     RULESET_UPDATED,
     RULESET_ACTIVATED,
     RULESET_ARCHIVED,
+    RULESET_UNARCHIVED,
+    RULESET_MOVED_TO_DRAFT,
     RULESET_DELETED,
 
-    // Rule actions
+    // Rule
     RULE_CREATED,
     RULE_UPDATED,
     RULE_ENABLED,
     RULE_DISABLED,
     RULE_DELETED,
 
-    // Versioning actions
+    // Conditions & Actions
+    CONDITION_CREATED,
+    CONDITION_UPDATED,
+    CONDITION_DELETED,
+    ACTION_CREATED,
+    ACTION_UPDATED,
+    ACTION_DELETED,
+
+    // Versioning
     VERSION_CREATED,
     ROLLBACK_PERFORMED,
 
-    // Import/Export actions
+    // Import/Export
     CONFIG_IMPORTED,
     CONFIG_EXPORTED,
 
-    // AI actions
+    // Evaluation
+    RULESET_EVALUATED,
+
+    // AI
     INSIGHT_ACCEPTED,
     INSIGHT_REJECTED
 }

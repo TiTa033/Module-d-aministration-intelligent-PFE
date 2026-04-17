@@ -60,7 +60,7 @@ public class AuditLog {
     private LocalDateTime timestamp;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tenant_id", nullable = false)
+    @JoinColumn(name = "tenant_id", nullable = true)
     private Tenant tenant;
 
     @ManyToOne(fetch = FetchType.LAZY)

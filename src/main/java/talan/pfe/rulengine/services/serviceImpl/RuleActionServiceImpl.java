@@ -8,15 +8,17 @@ import talan.pfe.rulengine.dtos.response.RuleActionResponse;
 import talan.pfe.rulengine.entites.Rule;
 import talan.pfe.rulengine.entites.RuleAction;
 import talan.pfe.rulengine.entites.RuleSet;
+import talan.pfe.rulengine.enums.AuditAction;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 import talan.pfe.rulengine.exception.BadRequestException;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
+import talan.pfe.rulengine.kafka.AuditProducer;
 import talan.pfe.rulengine.mappers.RuleActionMapper;
 import talan.pfe.rulengine.repositories.RuleActionRepository;
 import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
+import talan.pfe.rulengine.security.CurrentUserResolver;
 import talan.pfe.rulengine.services.RuleActionService;
-import talan.pfe.rulengine.services.RuleSetVersioningService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,13 +32,13 @@ public class RuleActionServiceImpl implements RuleActionService {
     private final RuleRepository ruleRepository;
     private final RuleActionRepository ruleActionRepository;
     private final RuleActionMapper ruleActionMapper;
-    private final RuleSetVersioningService ruleSetVersioningService;
+    private final AuditProducer auditProducer;
+    private final CurrentUserResolver currentUserResolver;
 
     @Override
     @Transactional
     public RuleActionResponse create(Long ruleSetId, Long ruleId,
-                                     Long tenantId,
-                                     RuleActionRequest request) {
+                                     Long tenantId, RuleActionRequest request) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
 
         if (rule.getRuleSet().getStatus() == RuleSetStatus.ARCHIVED) {
@@ -51,21 +53,24 @@ public class RuleActionServiceImpl implements RuleActionService {
                 .rule(rule)
                 .build();
 
-
-        RuleAction saved = ruleActionRepository.save(action);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Action added to rule " + rule.getName());
-        return ruleActionMapper.toDto(saved);
-
         rule.setPendingUpdate(true);
-        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+        rule.setActivationDate(
+                LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
-        return ruleActionMapper.toDto(ruleActionRepository.save(action));
+        RuleActionResponse saved = ruleActionMapper.toDto(
+                ruleActionRepository.save(action));
+
+        auditProducer.publish(
+                AuditAction.ACTION_CREATED, "ACTION", saved.getId(),
+                null, request.getActionType() + " → " + request.getOutputKey()
+                        + " = " + request.getOutputValue(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     @Override
-    public List<RuleActionResponse> getAll(Long ruleSetId, Long ruleId,
-                                           Long tenantId) {
+    public List<RuleActionResponse> getAll(Long ruleSetId, Long ruleId, Long tenantId) {
         findRuleOrThrow(ruleSetId, ruleId, tenantId);
         return ruleActionMapper.toDtoList(
                 ruleActionRepository.findAllByRuleIdOrderByIdAsc(ruleId));
@@ -99,25 +104,33 @@ public class RuleActionServiceImpl implements RuleActionService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleAction not found with id: " + id));
 
+        String oldValue = action.getActionType() + " → " + action.getOutputKey()
+                + " = " + action.getOutputValue();
+
         action.setActionType(request.getActionType());
         action.setOutputKey(request.getOutputKey());
         action.setOutputValue(request.getOutputValue());
 
-        RuleAction saved = ruleActionRepository.save(action);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Action updated on rule " + rule.getName());
-        return ruleActionMapper.toDto(saved);
-
         rule.setPendingUpdate(true);
-        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+        rule.setActivationDate(
+                LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
 
-        return ruleActionMapper.toDto(ruleActionRepository.save(action));
+        RuleActionResponse saved = ruleActionMapper.toDto(
+                ruleActionRepository.save(action));
+
+        auditProducer.publish(
+                AuditAction.ACTION_UPDATED, "ACTION", id,
+                oldValue,
+                request.getActionType() + " → " + request.getOutputKey()
+                        + " = " + request.getOutputValue(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     @Override
     @Transactional
-    public void delete(Long ruleSetId, Long ruleId,
-                       Long id, Long tenantId) {
+    public void delete(Long ruleSetId, Long ruleId, Long id, Long tenantId) {
         Rule rule = findRuleOrThrow(ruleSetId, ruleId, tenantId);
 
         if (rule.getRuleSet().getStatus() == RuleSetStatus.ARCHIVED) {
@@ -131,15 +144,20 @@ public class RuleActionServiceImpl implements RuleActionService {
                         "RuleAction not found with id: " + id));
 
         rule.setPendingUpdate(true);
-        rule.setActivationDate(LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+        rule.setActivationDate(
+                LocalDateTime.now().plusDays(1).toLocalDate().atStartOfDay());
+
+        auditProducer.publish(
+                AuditAction.ACTION_DELETED, "ACTION", id,
+                action.getActionType() + " → " + action.getOutputKey()
+                        + " = " + action.getOutputValue(),
+                null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
 
         ruleActionRepository.delete(action);
-        ruleSetVersioningService.recordSnapshot(
-                ruleSetId, tenantId, "Action deleted on rule " + rule.getName());
     }
 
-    private Rule findRuleOrThrow(Long ruleSetId, Long ruleId,
-                                 Long tenantId) {
+    private Rule findRuleOrThrow(Long ruleSetId, Long ruleId, Long tenantId) {
         RuleSet ruleSet = ruleSetRepository
                 .findByIdAndTenantId(ruleSetId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(

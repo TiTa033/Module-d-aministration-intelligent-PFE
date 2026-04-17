@@ -17,6 +17,12 @@ databaseChangeLog:
       file: db/changelog/changes/009-api-key-prefix-and-version-seq.yaml
   - include:
       file: db/changelog/changes/010-ensure-api-keys-ruleset-link.yaml
+  - include:
+      file: db/changelog/changes/011-update_audit_action_check.yaml
+  - include:
+      file: db/changelog/changes/012-notifications-user-nullable.yaml
+  - include:
+      file: db/changelog/changes/013-notifications-type-check.yaml
   # NOTE:
   # The "add/drop phone" changesets were only a Liquibase test.
   # After recreating the database from scratch, there is no baseline schema yet,

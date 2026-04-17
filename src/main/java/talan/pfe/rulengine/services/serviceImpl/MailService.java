@@ -9,6 +9,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import talan.pfe.rulengine.kafka.AuditProducer;
+import talan.pfe.rulengine.security.CurrentUserResolver;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +19,8 @@ import org.springframework.stereotype.Service;
 public class MailService {
 
     private final JavaMailSender mailSender;
+    private final AuditProducer auditProducer;
+    private final CurrentUserResolver currentUserResolver;
 
     public void send(String to, String subject, String text) {
         SimpleMailMessage message = new SimpleMailMessage();

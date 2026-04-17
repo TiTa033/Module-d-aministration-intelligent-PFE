@@ -15,6 +15,7 @@ import talan.pfe.rulengine.dtos.response.AuthResponse;
 import talan.pfe.rulengine.enums.Role;
 import talan.pfe.rulengine.exception.ResourceNotFoundException;
 import talan.pfe.rulengine.exception.TokenException;
+import talan.pfe.rulengine.kafka.AuditProducer;
 import talan.pfe.rulengine.repositories.PasswordResetTokenRepository;
 import talan.pfe.rulengine.repositories.RefreshTokenRepository;
 import talan.pfe.rulengine.repositories.TenantRepository;
@@ -38,6 +39,8 @@ public class AuthServiceImpl implements AuthService {
     private final MailService mailService;
     private final OtpService otpService;
     private final CaptchaService captchaService;
+    private final AuditProducer auditProducer;
+    private final CurrentUserResolver currentUserResolver;
 
     // ─── LOGIN ──────────────────────────────────────────────
     @Override

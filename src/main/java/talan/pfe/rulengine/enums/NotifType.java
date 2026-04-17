@@ -1,6 +1,13 @@
 package talan.pfe.rulengine.enums;
 
 public enum NotifType {
+
+    // Generic UI notifications
+    SUCCESS,
+    WARNING,
+    ERROR,
+    INFO,
+
     // Versioning
     ROLLBACK_PERFORMED,
 

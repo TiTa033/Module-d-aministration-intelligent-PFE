@@ -10,13 +10,17 @@ import talan.pfe.rulengine.dtos.response.PageResponse;
 import talan.pfe.rulengine.dtos.response.RuleSetResponse;
 import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.entites.Tenant;
+import talan.pfe.rulengine.enums.AuditAction;
+import talan.pfe.rulengine.enums.NotifType;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 import talan.pfe.rulengine.exception.*;
+import talan.pfe.rulengine.kafka.AuditProducer;
+import talan.pfe.rulengine.kafka.NotificationProducer;
 import talan.pfe.rulengine.mappers.RuleSetMapper;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.repositories.TenantRepository;
+import talan.pfe.rulengine.security.CurrentUserResolver;
 import talan.pfe.rulengine.services.RuleSetService;
-import talan.pfe.rulengine.services.RuleSetVersioningService;
 
 @Service
 @RequiredArgsConstructor
@@ -26,18 +30,18 @@ public class RuleSetServiceImpl implements RuleSetService {
     private final RuleSetRepository ruleSetRepository;
     private final TenantRepository tenantRepository;
     private final RuleSetMapper ruleSetMapper;
-    private final RuleSetVersioningService ruleSetVersioningService;
+    private final AuditProducer auditProducer;
+    private final CurrentUserResolver currentUserResolver;
+    private final NotificationProducer notificationProducer;
 
     @Override
     @Transactional
-    public RuleSetResponse create(CreateRuleSetRequest request,
-                                  Long tenantId) {
+    public RuleSetResponse create(CreateRuleSetRequest request, Long tenantId) {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Tenant not found with id: " + tenantId));
 
-        if (ruleSetRepository.existsByNameAndTenantId(
-                request.getName(), tenantId)) {
+        if (ruleSetRepository.existsByNameAndTenantId(request.getName(), tenantId)) {
             throw new ConflictException(
                     "A RuleSet with name '" + request.getName() +
                             "' already exists in this tenant");
@@ -50,10 +54,14 @@ public class RuleSetServiceImpl implements RuleSetService {
                 .tenant(tenant)
                 .build();
 
-        RuleSet saved = ruleSetRepository.save(ruleSet);
-        ruleSetVersioningService.recordSnapshot(
-                saved.getId(), tenantId, "RuleSet created");
-        return ruleSetMapper.toDto(saved);
+        RuleSetResponse saved = ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+
+        auditProducer.publish(
+                AuditAction.RULESET_CREATED, "RULESET", saved.getId(),
+                null, saved.getName(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     @Override
@@ -61,6 +69,7 @@ public class RuleSetServiceImpl implements RuleSetService {
         return ruleSetMapper.toDto(findOrThrow(id, tenantId));
     }
 
+    @Override
     public PageResponse<RuleSetResponse> getAll(
             Long tenantId, String search, String status,
             int page, int size, String sortBy, String sortDir) {
@@ -84,8 +93,7 @@ public class RuleSetServiceImpl implements RuleSetService {
         Pageable pageable = PageRequest.of(page, size, sort);
 
         Page<RuleSetResponse> resultPage = ruleSetRepository
-                .findAllByTenantWithFilters(
-                        tenantId, searchParam, ruleSetStatus, pageable)
+                .findAllByTenantWithFilters(tenantId, searchParam, ruleSetStatus, pageable)
                 .map(ruleSetMapper::toDto);
 
         return PageResponse.from(resultPage);
@@ -93,8 +101,7 @@ public class RuleSetServiceImpl implements RuleSetService {
 
     @Override
     @Transactional
-    public RuleSetResponse update(Long id, Long tenantId,
-                                  UpdateRuleSetRequest request) {
+    public RuleSetResponse update(Long id, Long tenantId, UpdateRuleSetRequest request) {
         RuleSet ruleSet = findOrThrow(id, tenantId);
 
         if (ruleSetRepository.existsByNameAndTenantIdAndIdNot(
@@ -105,18 +112,22 @@ public class RuleSetServiceImpl implements RuleSetService {
         }
 
         if (ruleSet.getStatus() == RuleSetStatus.ARCHIVED) {
-            throw new BadRequestException(
-                    "Cannot update an archived RuleSet");
+            throw new BadRequestException("Cannot update an archived RuleSet");
         }
 
+        String oldName = ruleSet.getName();
         ruleSet.setName(request.getName());
         ruleSet.setDescription(request.getDescription());
         ruleSet.setEvaluationStrategy(request.getEvaluationStrategy());
 
-        RuleSet saved = ruleSetRepository.save(ruleSet);
-        ruleSetVersioningService.recordSnapshot(
-                id, tenantId, "RuleSet metadata updated");
-        return ruleSetMapper.toDto(saved);
+        RuleSetResponse saved = ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+
+        auditProducer.publish(
+                AuditAction.RULESET_UPDATED, "RULESET", id,
+                oldName, saved.getName(),
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     @Override
@@ -134,9 +145,18 @@ public class RuleSetServiceImpl implements RuleSetService {
         }
 
         ruleSet.setStatus(RuleSetStatus.ACTIVE);
-        RuleSet saved = ruleSetRepository.save(ruleSet);
-        ruleSetVersioningService.recordSnapshot(id, tenantId, "RuleSet activated");
-        return ruleSetMapper.toDto(saved);
+        RuleSetResponse saved = ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+
+        auditProducer.publish(
+                AuditAction.RULESET_ACTIVATED, "RULESET", id,
+                null, null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+        notificationProducer.publish(
+                "RuleSet activé",
+                "Le RuleSet '" + ruleSet.getName() + "' est maintenant actif",
+                NotifType.SUCCESS, tenantId, id, "RULESET");
+        return saved;
+
     }
 
     @Override
@@ -149,9 +169,18 @@ public class RuleSetServiceImpl implements RuleSetService {
         }
 
         ruleSet.setStatus(RuleSetStatus.ARCHIVED);
-        RuleSet saved = ruleSetRepository.save(ruleSet);
-        ruleSetVersioningService.recordSnapshot(id, tenantId, "RuleSet archived");
-        return ruleSetMapper.toDto(saved);
+        RuleSetResponse saved = ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+
+        auditProducer.publish(
+                AuditAction.RULESET_ARCHIVED, "RULESET", id,
+                null, null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+        notificationProducer.publish(
+                "RuleSet archivé",
+                "Le RuleSet '" + ruleSet.getName() + "' a été archivé",
+                NotifType.WARNING, tenantId, id, "RULESET");
+
+        return saved;
     }
 
     @Override
@@ -164,9 +193,14 @@ public class RuleSetServiceImpl implements RuleSetService {
         }
 
         ruleSet.setStatus(RuleSetStatus.DRAFT);
-        RuleSet saved = ruleSetRepository.save(ruleSet);
-        ruleSetVersioningService.recordSnapshot(id, tenantId, "RuleSet moved to draft");
-        return ruleSetMapper.toDto(saved);
+        RuleSetResponse saved = ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+
+        auditProducer.publish(
+                AuditAction.RULESET_MOVED_TO_DRAFT, "RULESET", id,
+                null, null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     @Override
@@ -179,8 +213,14 @@ public class RuleSetServiceImpl implements RuleSetService {
                     "Cannot delete an active RuleSet. Archive it first.");
         }
 
+        auditProducer.publish(
+                AuditAction.RULESET_DELETED, "RULESET", id,
+                ruleSet.getName(), null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
         ruleSetRepository.delete(ruleSet);
     }
+
     @Override
     @Transactional
     public RuleSetResponse unarchive(Long id, Long tenantId) {
@@ -190,8 +230,15 @@ public class RuleSetServiceImpl implements RuleSetService {
             throw new BadRequestException("Only archived RuleSets can be unarchived");
         }
 
-        ruleSet.setStatus(RuleSetStatus.DRAFT); // or ACTIVE if you prefer
-        return ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+        ruleSet.setStatus(RuleSetStatus.DRAFT);
+        RuleSetResponse saved = ruleSetMapper.toDto(ruleSetRepository.save(ruleSet));
+
+        auditProducer.publish(
+                AuditAction.RULESET_UNARCHIVED, "RULESET", id,
+                null, null,
+                tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        return saved;
     }
 
     private RuleSet findOrThrow(Long id, Long tenantId) {
