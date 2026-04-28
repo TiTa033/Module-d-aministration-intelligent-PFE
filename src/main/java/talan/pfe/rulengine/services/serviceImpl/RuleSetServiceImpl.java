@@ -10,6 +10,7 @@ import talan.pfe.rulengine.dtos.response.PageResponse;
 import talan.pfe.rulengine.dtos.response.RuleSetResponse;
 import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.entites.Tenant;
+import talan.pfe.rulengine.entites.User;
 import talan.pfe.rulengine.enums.AuditAction;
 import talan.pfe.rulengine.enums.NotifType;
 import talan.pfe.rulengine.enums.RuleSetStatus;
@@ -19,8 +20,11 @@ import talan.pfe.rulengine.kafka.NotificationProducer;
 import talan.pfe.rulengine.mappers.RuleSetMapper;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.repositories.TenantRepository;
+import talan.pfe.rulengine.repositories.UserRepository;
 import talan.pfe.rulengine.security.CurrentUserResolver;
 import talan.pfe.rulengine.services.RuleSetService;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +37,10 @@ public class RuleSetServiceImpl implements RuleSetService {
     private final AuditProducer auditProducer;
     private final CurrentUserResolver currentUserResolver;
     private final NotificationProducer notificationProducer;
+    private final RuleSetDocumentationAgent ruleSetDocumentationAgent;
+    private final N8nWebhookService n8nWebhookService;
+    private final UserRepository userRepository;
+    private final MailService mailService;
 
     @Override
     @Transactional
@@ -155,6 +163,15 @@ public class RuleSetServiceImpl implements RuleSetService {
                 "RuleSet activé",
                 "Le RuleSet '" + ruleSet.getName() + "' est maintenant actif",
                 NotifType.SUCCESS, tenantId, id, "RULESET");
+        ruleSetDocumentationAgent.generateDocumentation(id, tenantId);
+        User currentUser = null;
+        try {
+            currentUser = currentUserResolver.requireUser();
+        } catch (Exception ignored) {
+            // Keep activation flow resilient even when user context is unavailable.
+        }
+        notifyTenantMembersByEmail(ruleSet, currentUser);
+        n8nWebhookService.notifyRuleSetActivated(ruleSet, currentUser);
         return saved;
 
     }
@@ -245,5 +262,28 @@ public class RuleSetServiceImpl implements RuleSetService {
         return ruleSetRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "RuleSet not found with id: " + id));
+    }
+
+    private void notifyTenantMembersByEmail(RuleSet ruleSet, User currentUser) {
+        if (ruleSet.getTenant() == null || ruleSet.getTenant().getId() == null) {
+            return;
+        }
+        List<String> recipients = userRepository.findAllByTenantId(ruleSet.getTenant().getId())
+                .stream()
+                .filter(User::isActive)
+                .map(User::getEmail)
+                .filter(email -> email != null && !email.isBlank())
+                .distinct()
+                .toList();
+        if (recipients.isEmpty()) {
+            return;
+        }
+        String activatedBy = currentUser != null ? currentUser.getEmail() : null;
+        mailService.sendRuleSetActivatedEmail(
+                recipients,
+                ruleSet.getTenant().getName(),
+                ruleSet.getName(),
+                activatedBy
+        );
     }
 }

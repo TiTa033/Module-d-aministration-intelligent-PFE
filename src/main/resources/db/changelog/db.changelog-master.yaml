@@ -23,6 +23,10 @@ databaseChangeLog:
       file: db/changelog/changes/012-notifications-user-nullable.yaml
   - include:
       file: db/changelog/changes/013-notifications-type-check.yaml
+  - include:
+      file: db/changelog/changes/014-ai-insights-and-chat.yaml
+  - include:
+      file: db/changelog/changes/015-seed-multi-rulesets-with-conditions-actions.yaml
   # NOTE:
   # The "add/drop phone" changesets were only a Liquibase test.
   # After recreating the database from scratch, there is no baseline schema yet,

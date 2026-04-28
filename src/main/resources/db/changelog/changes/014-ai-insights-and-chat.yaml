@@ -1,0 +1,260 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014a-create-ai-insight-seq
+      author: rulengine
+      preConditions:
+        onFail: MARK_RAN
+        onError: MARK_RAN
+        not:
+          sequenceExists:
+            sequenceName: ai_insight_seq
+      changes:
+        - createSequence:
+            sequenceName: ai_insight_seq
+            startValue: 1
+            incrementBy: 1
+
+  - changeSet:
+      id: 014b-create-ai-insights-table
+      author: rulengine
+      preConditions:
+        onFail: MARK_RAN
+        onError: MARK_RAN
+        not:
+          tableExists:
+            tableName: ai_insights
+      changes:
+        - createTable:
+            tableName: ai_insights
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: type
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: agent_type
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: varchar(2000)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: suggestion
+                  type: jsonb
+              - column:
+                  name: context_data
+                  type: jsonb
+              - column:
+                  name: confidence
+                  type: float
+                  constraints:
+                    nullable: false
+              - column:
+                  name: generated_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resolved_at
+                  type: timestamp
+              - column:
+                  name: tenant_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: rule_set_id
+                  type: bigint
+              - column:
+                  name: resolved_by
+                  type: bigint
+        - addForeignKeyConstraint:
+            baseTableName: ai_insights
+            baseColumnNames: tenant_id
+            referencedTableName: tenants
+            referencedColumnNames: id
+            constraintName: fk_ai_insight_tenant
+        - addForeignKeyConstraint:
+            baseTableName: ai_insights
+            baseColumnNames: rule_set_id
+            referencedTableName: rule_sets
+            referencedColumnNames: id
+            constraintName: fk_ai_insight_rule_set
+        - addForeignKeyConstraint:
+            baseTableName: ai_insights
+            baseColumnNames: resolved_by
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: fk_ai_insight_resolved_by
+        - createIndex:
+            tableName: ai_insights
+            indexName: idx_insight_tenant
+            columns:
+              - column:
+                  name: tenant_id
+        - createIndex:
+            tableName: ai_insights
+            indexName: idx_insight_ruleset
+            columns:
+              - column:
+                  name: rule_set_id
+        - createIndex:
+            tableName: ai_insights
+            indexName: idx_insight_type
+            columns:
+              - column:
+                  name: type
+        - createIndex:
+            tableName: ai_insights
+            indexName: idx_insight_status
+            columns:
+              - column:
+                  name: status
+        - createIndex:
+            tableName: ai_insights
+            indexName: idx_insight_agent
+            columns:
+              - column:
+                  name: agent_type
+
+  - changeSet:
+      id: 014c-create-chat-sequences
+      author: rulengine
+      preConditions:
+        onFail: MARK_RAN
+        onError: MARK_RAN
+        and:
+          - not:
+              sequenceExists:
+                sequenceName: chat_conversation_seq
+          - not:
+              sequenceExists:
+                sequenceName: chat_message_seq
+      changes:
+        - createSequence:
+            sequenceName: chat_conversation_seq
+            startValue: 1
+            incrementBy: 1
+        - createSequence:
+            sequenceName: chat_message_seq
+            startValue: 1
+            incrementBy: 1
+
+  - changeSet:
+      id: 014d-create-chat-tables
+      author: rulengine
+      preConditions:
+        onFail: MARK_RAN
+        onError: MARK_RAN
+        and:
+          - not:
+              tableExists:
+                tableName: chat_conversations
+          - not:
+              tableExists:
+                tableName: chat_messages
+      changes:
+        - createTable:
+            tableName: chat_conversations
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: chat_messages
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: conversation_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content
+                  type: varchar(4000)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: chat_conversations
+            baseColumnNames: tenant_id
+            referencedTableName: tenants
+            referencedColumnNames: id
+            constraintName: fk_chat_conv_tenant
+        - addForeignKeyConstraint:
+            baseTableName: chat_conversations
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: fk_chat_conv_user
+        - addForeignKeyConstraint:
+            baseTableName: chat_messages
+            baseColumnNames: conversation_id
+            referencedTableName: chat_conversations
+            referencedColumnNames: id
+            constraintName: fk_chat_msg_conversation
+        - createIndex:
+            tableName: chat_messages
+            indexName: idx_chat_msg_conversation_created
+            columns:
+              - column:
+                  name: conversation_id
+              - column:
+                  name: created_at
