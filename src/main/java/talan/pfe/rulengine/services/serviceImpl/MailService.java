@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import talan.pfe.rulengine.kafka.AuditProducer;
 import talan.pfe.rulengine.security.CurrentUserResolver;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -29,6 +31,33 @@ public class MailService {
         message.setText(text);
         mailSender.send(message);
     }
+
+    @Async
+    public void sendRuleSetActivatedEmail(List<String> recipients, String tenantName, String ruleSetName, String activatedBy) {
+        if (recipients == null || recipients.isEmpty()) {
+            return;
+        }
+        String subject = "RaaS - RuleSet activé : " + ruleSetName;
+        String body = buildRuleSetActivatedEmailTemplate(tenantName, ruleSetName, activatedBy);
+
+        for (String email : recipients) {
+            try {
+                sendHtml(email, subject, body);
+            } catch (Exception ex) {
+                log.warn("Failed to send RuleSet activation email to {}: {}", email, ex.getMessage());
+            }
+        }
+    }
+
+    private void sendHtml(String to, String subject, String html) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        helper.setTo(to);
+        helper.setSubject(subject);
+        helper.setText(html, true);
+        mailSender.send(message);
+    }
+
     @Async
     public void sendOtpEmail(String toEmail, String otp) {
         try {
@@ -75,6 +104,41 @@ public class MailService {
                 </div>
             </div>
             """.formatted(otp);
+    }
+
+    private String buildRuleSetActivatedEmailTemplate(String tenantName, String ruleSetName, String activatedBy) {
+        String actor = (activatedBy == null || activatedBy.isBlank()) ? "système" : activatedBy;
+        String tenant = (tenantName == null || tenantName.isBlank()) ? "N/A" : tenantName;
+        String ruleSet = (ruleSetName == null || ruleSetName.isBlank()) ? "N/A" : ruleSetName;
+
+        return """
+            <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; background: #f8fbff; border: 1px solid #dbeafe; border-radius: 14px; overflow: hidden;">
+              <div style="background: linear-gradient(135deg,#1d4ed8,#1e40af); color: #fff; padding: 20px 22px;">
+                <h2 style="margin: 0; font-size: 22px;">RaaS - RuleSet activé</h2>
+                <p style="margin: 6px 0 0; opacity: 0.95;">Notification automatique de la plateforme</p>
+              </div>
+              <div style="padding: 20px 22px; color: #1e293b;">
+                <p style="margin: 0 0 12px;">Bonjour,</p>
+                <p style="margin: 0 0 16px;">
+                  Le RuleSet suivant vient d'être activé et est désormais en production.
+                </p>
+                <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;">
+                  <p style="margin: 0 0 8px;"><strong>Tenant:</strong> %s</p>
+                  <p style="margin: 0 0 8px;"><strong>RuleSet:</strong> %s</p>
+                  <p style="margin: 0;"><strong>Activé par:</strong> %s</p>
+                </div>
+                <p style="margin: 0 0 14px;">
+                  Vous pouvez consulter les détails (règles, versions, documentation IA) directement dans le module RuleSets.
+                </p>
+                <a href="http://localhost:4200" style="display: inline-block; background: #2563eb; color: #fff; text-decoration: none; font-weight: 600; border-radius: 10px; padding: 10px 14px;">
+                  Ouvrir la plateforme
+                </a>
+              </div>
+              <div style="padding: 12px 22px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; background: #ffffff;">
+                Message automatique RaaS - merci de ne pas répondre à cet email.
+              </div>
+            </div>
+            """.formatted(tenant, ruleSet, actor);
     }
 }
 

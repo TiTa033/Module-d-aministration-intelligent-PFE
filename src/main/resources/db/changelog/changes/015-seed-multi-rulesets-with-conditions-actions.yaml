@@ -1,0 +1,245 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-seed-multi-rulesets-with-conditions-actions
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - tableExists:
+            tableName: tenants
+        - tableExists:
+            tableName: rule_sets
+        - tableExists:
+            tableName: rules
+        - tableExists:
+            tableName: rule_conditions
+        - tableExists:
+            tableName: rule_actions
+      changes:
+        - sql:
+            dbms: postgresql
+            splitStatements: true
+            stripComments: true
+            sql: |
+              -- Seed for first available tenant (if none exists, inserts are skipped)
+              -- =========================
+              -- 1) RULESETS
+              -- =========================
+              INSERT INTO rule_sets (id, name, description, evaluation_strategy, status, current_version, tenant_id, created_at, updated_at)
+              SELECT nextval('rule_set_seq'), 'LOAN_ELIGIBILITY', 'Decision rules for loan eligibility', 'ALL_MATCH', 'DRAFT', 1, t.id, now(), now()
+              FROM (
+                SELECT id
+                FROM tenants
+                WHERE slug = 'bnp' OR name = 'Demo Tenant BNP'
+                ORDER BY id
+                LIMIT 1
+              ) t
+              WHERE NOT EXISTS (
+                SELECT 1 FROM rule_sets rs WHERE rs.name = 'LOAN_ELIGIBILITY' AND rs.tenant_id = t.id
+              );
+
+              INSERT INTO rule_sets (id, name, description, evaluation_strategy, status, current_version, tenant_id, created_at, updated_at)
+              SELECT nextval('rule_set_seq'), 'KYC_SCREENING', 'Identity and compliance validation rules', 'FIRST_MATCH', 'DRAFT', 1, t.id, now(), now()
+              FROM (
+                SELECT id
+                FROM tenants
+                WHERE slug = 'bnp' OR name = 'Demo Tenant BNP'
+                ORDER BY id
+                LIMIT 1
+              ) t
+              WHERE NOT EXISTS (
+                SELECT 1 FROM rule_sets rs WHERE rs.name = 'KYC_SCREENING' AND rs.tenant_id = t.id
+              );
+
+              INSERT INTO rule_sets (id, name, description, evaluation_strategy, status, current_version, tenant_id, created_at, updated_at)
+              SELECT nextval('rule_set_seq'), 'FRAUD_MONITORING', 'Transaction anti-fraud scoring rules', 'SCORE_BASED', 'DRAFT', 1, t.id, now(), now()
+              FROM (
+                SELECT id
+                FROM tenants
+                WHERE slug = 'bnp' OR name = 'Demo Tenant BNP'
+                ORDER BY id
+                LIMIT 1
+              ) t
+              WHERE NOT EXISTS (
+                SELECT 1 FROM rule_sets rs WHERE rs.name = 'FRAUD_MONITORING' AND rs.tenant_id = t.id
+              );
+
+              -- =========================
+              -- 2) RULES
+              -- =========================
+              INSERT INTO rules (id, rule_set_id, name, priority, enabled, logic_operator, score, description, created_at, updated_at)
+              SELECT nextval('rule_seq'), rs.id, 'Income and age eligible', 1, true, 'AND', NULL,
+                     'Approve only if monthly income and age are above thresholds', now(), now()
+              FROM rule_sets rs
+              WHERE rs.name = 'LOAN_ELIGIBILITY'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rules r WHERE r.rule_set_id = rs.id AND r.name = 'Income and age eligible'
+                );
+
+              INSERT INTO rules (id, rule_set_id, name, priority, enabled, logic_operator, score, description, created_at, updated_at)
+              SELECT nextval('rule_seq'), rs.id, 'High debt ratio review', 2, true, 'AND', NULL,
+                     'Route to review when debt ratio is too high', now(), now()
+              FROM rule_sets rs
+              WHERE rs.name = 'LOAN_ELIGIBILITY'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rules r WHERE r.rule_set_id = rs.id AND r.name = 'High debt ratio review'
+                );
+
+              INSERT INTO rules (id, rule_set_id, name, priority, enabled, logic_operator, score, description, created_at, updated_at)
+              SELECT nextval('rule_seq'), rs.id, 'Missing mandatory KYC data', 1, true, 'OR', NULL,
+                     'Reject if mandatory identity data is missing', now(), now()
+              FROM rule_sets rs
+              WHERE rs.name = 'KYC_SCREENING'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rules r WHERE r.rule_set_id = rs.id AND r.name = 'Missing mandatory KYC data'
+                );
+
+              INSERT INTO rules (id, rule_set_id, name, priority, enabled, logic_operator, score, description, created_at, updated_at)
+              SELECT nextval('rule_seq'), rs.id, 'Sanctioned country flag', 2, true, 'AND', NULL,
+                     'Flag customers from sanctioned countries for review', now(), now()
+              FROM rule_sets rs
+              WHERE rs.name = 'KYC_SCREENING'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rules r WHERE r.rule_set_id = rs.id AND r.name = 'Sanctioned country flag'
+                );
+
+              INSERT INTO rules (id, rule_set_id, name, priority, enabled, logic_operator, score, description, created_at, updated_at)
+              SELECT nextval('rule_seq'), rs.id, 'Large transaction amount', 1, true, 'AND', 60,
+                     'Add score for large single transaction', now(), now()
+              FROM rule_sets rs
+              WHERE rs.name = 'FRAUD_MONITORING'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rules r WHERE r.rule_set_id = rs.id AND r.name = 'Large transaction amount'
+                );
+
+              INSERT INTO rules (id, rule_set_id, name, priority, enabled, logic_operator, score, description, created_at, updated_at)
+              SELECT nextval('rule_seq'), rs.id, 'Risky country transaction', 2, true, 'AND', 50,
+                     'Add score for risky country origins', now(), now()
+              FROM rule_sets rs
+              WHERE rs.name = 'FRAUD_MONITORING'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rules r WHERE r.rule_set_id = rs.id AND r.name = 'Risky country transaction'
+                );
+
+              -- =========================
+              -- 3) CONDITIONS
+              -- =========================
+              INSERT INTO rule_conditions (id, rule_id, field, operator, value, value_type)
+              SELECT nextval('rule_condition_seq'), r.id, 'income', 'GREATER_OR_EQUAL', '3000', 'NUMBER'
+              FROM rules r
+              WHERE r.name = 'Income and age eligible'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_conditions c
+                  WHERE c.rule_id = r.id AND c.field = 'income' AND c.operator = 'GREATER_OR_EQUAL'
+                );
+
+              INSERT INTO rule_conditions (id, rule_id, field, operator, value, value_type)
+              SELECT nextval('rule_condition_seq'), r.id, 'age', 'GREATER_OR_EQUAL', '21', 'NUMBER'
+              FROM rules r
+              WHERE r.name = 'Income and age eligible'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_conditions c
+                  WHERE c.rule_id = r.id AND c.field = 'age' AND c.operator = 'GREATER_OR_EQUAL'
+                );
+
+              INSERT INTO rule_conditions (id, rule_id, field, operator, value, value_type)
+              SELECT nextval('rule_condition_seq'), r.id, 'debtRatio', 'GREATER_THAN', '45', 'NUMBER'
+              FROM rules r
+              WHERE r.name = 'High debt ratio review'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_conditions c
+                  WHERE c.rule_id = r.id AND c.field = 'debtRatio' AND c.operator = 'GREATER_THAN'
+                );
+
+              INSERT INTO rule_conditions (id, rule_id, field, operator, value, value_type)
+              SELECT nextval('rule_condition_seq'), r.id, 'nationalId', 'IS_NULL', '', 'STRING'
+              FROM rules r
+              WHERE r.name = 'Missing mandatory KYC data'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_conditions c
+                  WHERE c.rule_id = r.id AND c.field = 'nationalId' AND c.operator = 'IS_NULL'
+                );
+
+              INSERT INTO rule_conditions (id, rule_id, field, operator, value, value_type)
+              SELECT nextval('rule_condition_seq'), r.id, 'country', 'IN_LIST', 'IR,RU,KP', 'STRING'
+              FROM rules r
+              WHERE r.name = 'Sanctioned country flag'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_conditions c
+                  WHERE c.rule_id = r.id AND c.field = 'country' AND c.operator = 'IN_LIST'
+                );
+
+              INSERT INTO rule_conditions (id, rule_id, field, operator, value, value_type)
+              SELECT nextval('rule_condition_seq'), r.id, 'amount', 'GREATER_THAN', '10000', 'NUMBER'
+              FROM rules r
+              WHERE r.name = 'Large transaction amount'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_conditions c
+                  WHERE c.rule_id = r.id AND c.field = 'amount' AND c.operator = 'GREATER_THAN'
+                );
+
+              INSERT INTO rule_conditions (id, rule_id, field, operator, value, value_type)
+              SELECT nextval('rule_condition_seq'), r.id, 'country', 'IN_LIST', 'IR,RU,KP', 'STRING'
+              FROM rules r
+              WHERE r.name = 'Risky country transaction'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_conditions c
+                  WHERE c.rule_id = r.id AND c.field = 'country' AND c.operator = 'IN_LIST'
+                );
+
+              -- =========================
+              -- 4) ACTIONS
+              -- =========================
+              INSERT INTO rule_actions (id, rule_id, action_type, output_key, output_value)
+              SELECT nextval('rule_action_seq'), r.id, 'APPROVE', 'decision', 'APPROVED'
+              FROM rules r
+              WHERE r.name = 'Income and age eligible'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_actions a
+                  WHERE a.rule_id = r.id AND a.action_type = 'APPROVE' AND a.output_key = 'decision'
+                );
+
+              INSERT INTO rule_actions (id, rule_id, action_type, output_key, output_value)
+              SELECT nextval('rule_action_seq'), r.id, 'REQUIRE_REVIEW', 'decision', 'REVIEW'
+              FROM rules r
+              WHERE r.name = 'High debt ratio review'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_actions a
+                  WHERE a.rule_id = r.id AND a.action_type = 'REQUIRE_REVIEW' AND a.output_key = 'decision'
+                );
+
+              INSERT INTO rule_actions (id, rule_id, action_type, output_key, output_value)
+              SELECT nextval('rule_action_seq'), r.id, 'REJECT', 'decision', 'REJECTED'
+              FROM rules r
+              WHERE r.name = 'Missing mandatory KYC data'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_actions a
+                  WHERE a.rule_id = r.id AND a.action_type = 'REJECT' AND a.output_key = 'decision'
+                );
+
+              INSERT INTO rule_actions (id, rule_id, action_type, output_key, output_value)
+              SELECT nextval('rule_action_seq'), r.id, 'SET_FLAG', 'kycFlag', 'SANCTION_RISK'
+              FROM rules r
+              WHERE r.name = 'Sanctioned country flag'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_actions a
+                  WHERE a.rule_id = r.id AND a.action_type = 'SET_FLAG' AND a.output_key = 'kycFlag'
+                );
+
+              INSERT INTO rule_actions (id, rule_id, action_type, output_key, output_value)
+              SELECT nextval('rule_action_seq'), r.id, 'SET_SCORE', 'riskScore', '60'
+              FROM rules r
+              WHERE r.name = 'Large transaction amount'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_actions a
+                  WHERE a.rule_id = r.id AND a.action_type = 'SET_SCORE' AND a.output_key = 'riskScore'
+                );
+
+              INSERT INTO rule_actions (id, rule_id, action_type, output_key, output_value)
+              SELECT nextval('rule_action_seq'), r.id, 'SET_SCORE', 'riskScore', '50'
+              FROM rules r
+              WHERE r.name = 'Risky country transaction'
+                AND NOT EXISTS (
+                  SELECT 1 FROM rule_actions a
+                  WHERE a.rule_id = r.id AND a.action_type = 'SET_SCORE' AND a.output_key = 'riskScore'
+                );
