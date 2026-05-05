@@ -6,6 +6,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import talan.pfe.rulengine.entites.EvaluationRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
 
 import java.util.Optional;
 
@@ -25,4 +28,9 @@ public interface EvaluationRequestRepository
     Optional<EvaluationRequest> findByIdAndTenantId(
             @Param("id")       Long id,
             @Param("tenantId") Long tenantId);
+
+
+    @Query("SELECT er FROM EvaluationRequest er WHERE er.tenant.id = :tenantId ORDER BY er.requestedAt DESC")
+    Page<EvaluationRequest> findByTenantIdOrderByRequestedAtDesc(
+            @Param("tenantId") Long tenantId, Pageable pageable);
 }
