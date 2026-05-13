@@ -29,12 +29,18 @@ import java.util.StringJoiner;
 @RequiredArgsConstructor
 public class ChatService {
     private static final Set<String> PROJECT_CONTEXT_KEYWORDS = Set.of(
-            "raas", "rule engine", "moteur de regle", "moteur de regles",
-            "ruleset", "rule set", "regle", "regles", "condition", "conditions",
-            "action", "actions", "strategie", "strategy", "first_match", "all_match",
-            "score_based", "score", "tenant", "api key", "cle api", "evaluation",
-            "playground", "version", "rollback", "import", "export",
-            "documentation", "chatbot", "insight", "audit", "notification"
+            "raas", "rule", "regle", "regles", "ruleset", "rule set",
+            "condition", "conditions", "action", "actions",
+            "strategie", "strategy", "evaluation", "evaluer",
+            "first_match", "all_match", "score",
+            "tenant", "organisation", "api", "cle",
+            "playground", "version", "rollback",
+            "import", "export", "documentation",
+            "chatbot", "insight", "audit", "notification",
+            "activer", "desactiver", "archiver", "creer",
+            "modifier", "supprimer", "comment", "pourquoi",
+            "qu est", "quelle", "quel", "aide", "help",
+            "expliqu", "montr", "liste", "affich"
     );
 
     private static final String OUT_OF_SCOPE_REPLY = """
@@ -200,7 +206,9 @@ public class ChatService {
         if (prompt == null || prompt.isBlank()) {
             return true;
         }
-        String normalized = prompt.toLowerCase(Locale.ROOT);
+        String normalized = java.text.Normalizer
+                .normalize(prompt.toLowerCase(Locale.ROOT), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
         return PROJECT_CONTEXT_KEYWORDS.stream().anyMatch(normalized::contains);
     }
 
