@@ -85,7 +85,6 @@ pipeline {
                         --name ${APP_NAME} \
                         --network raas-cicd \
                         -p ${APP_PORT}:${APP_PORT} \
-                        --env-file .env \
                         ${APP_NAME}:latest
                 """
             }
