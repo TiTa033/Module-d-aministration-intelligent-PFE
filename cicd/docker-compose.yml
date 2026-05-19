@@ -1,0 +1,100 @@
+
+networks:
+  raas-cicd:
+    driver: bridge
+
+volumes:
+  jenkins_home:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
+  postgres_sonar:
+  prometheus_data:
+  grafana_data:
+
+services:
+
+  # ─── JENKINS ────────────────────────────────────────────────────
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: raas-jenkins
+    privileged: true
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - raas-cicd
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+    restart: unless-stopped
+
+  # ─── SONARQUBE ──────────────────────────────────────────────────
+  sonarqube:
+    image: sonarqube:community
+    container_name: raas-sonarqube
+    depends_on:
+      - sonar-db
+    ports:
+      - "9000:9000"
+    networks:
+      - raas-cicd
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://sonar-db:5432/sonarqube
+      - SONAR_JDBC_USERNAME=sonar
+      - SONAR_JDBC_PASSWORD=sonar
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+    restart: unless-stopped
+
+  # ─── SONARQUBE DATABASE ─────────────────────────────────────────
+  sonar-db:
+    image: postgres:15
+    container_name: raas-sonar-db
+    networks:
+      - raas-cicd
+    environment:
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=sonar
+      - POSTGRES_DB=sonarqube
+    volumes:
+      - postgres_sonar:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # ─── PROMETHEUS ─────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: raas-prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - raas-cicd
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+
+  # ─── GRAFANA ────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    platform: linux/amd64
+    container_name: raas-grafana
+    user: "0"
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    networks:
+      - raas-cicd
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
