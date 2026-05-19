@@ -6,6 +6,7 @@ pipeline {
         SONAR_TOKEN    = credentials('sonar-token')
         APP_NAME       = 'raas-backend'
         APP_PORT       = '8086'
+        DOCKER_NETWORK = 'cicd_raas-cicd'
     }
 
     tools {
@@ -83,7 +84,7 @@ pipeline {
                     docker rm   ${APP_NAME} || true
                     docker run -d \
                         --name ${APP_NAME} \
-                        --network raas-cicd \
+                        --network ${DOCKER_NETWORK} \
                         -p ${APP_PORT}:${APP_PORT} \
                         ${APP_NAME}:latest
                 """
