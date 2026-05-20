@@ -104,19 +104,17 @@ class ChatServiceTest {
                     .thenReturn(new PageImpl<>(List.of()));
             when(currentUserResolver.requireUser()).thenReturn(userWithTenant);
             when(chatConversationRepository.save(any())).thenReturn(conversation);
-            when(chatMessageRepository.save(any())).thenReturn(ChatMessage.builder()
-                    .id(1L).role(ChatRole.USER).content("Quelle est la capitale de France ?").build());
             when(chatMessageRepository.findTop12ByConversationIdOrderByCreatedAtDesc(100L))
                     .thenReturn(new ArrayList<>());
             when(chatMessageRepository.save(any())).thenReturn(mock(ChatMessage.class));
+            when(llmClient.chat(any(), any(), any())).thenReturn("mocked reply");
 
             ChatRequest req = new ChatRequest();
-            req.setMessage("Quelle est la capitale de France ?");
-            req.setConversationId(null); // new conversation
+            req.setMessage("Who won the Super Bowl ?");
+            req.setConversationId(null);
 
             ChatResponse response = service.chat(req);
 
-            // LLM should NOT be called for out-of-scope questions
             verify(llmClient, never()).chat(any(), any(), any());
             assertThat(response.getReply()).contains("limité au contexte");
         }
