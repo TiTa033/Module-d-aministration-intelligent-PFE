@@ -82,7 +82,7 @@ class RuleSimulationServiceImplTest {
         @DisplayName("should return zero-result response when no past evaluations exist")
         void simulate_noHistory_returnsZeroResult() {
             Page<EvaluationRequest> emptyPage = new PageImpl<>(List.of());
-            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L, any()))
+            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L), any()))
                     .thenReturn(emptyPage);
 
             SimulationRequest req = buildSimulationRequest();
@@ -103,7 +103,7 @@ class RuleSimulationServiceImplTest {
         void simulate_proposedConditionsMatchMore_detectsChange() {
             Page<EvaluationRequest> historyPage = new PageImpl<>(
                     List.of(evalWithAmount500, evalWithAmount200));
-            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L, any()))
+            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L), any()))
                     .thenReturn(historyPage);
             when(ruleRepository.findById(1L)).thenReturn(Optional.of(originalRule));
 
@@ -129,7 +129,7 @@ class RuleSimulationServiceImplTest {
         @DisplayName("should report no changes when same conditions produce identical results")
         void simulate_sameConditions_noChange() {
             Page<EvaluationRequest> historyPage = new PageImpl<>(List.of(evalWithAmount500));
-            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L, any()))
+            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L), any()))
                     .thenReturn(historyPage);
             when(ruleRepository.findById(1L)).thenReturn(Optional.of(originalRule));
 
@@ -157,7 +157,7 @@ class RuleSimulationServiceImplTest {
         @DisplayName("should return aiAvailable=false and fallback message when Groq throws")
         void simulate_groqThrows_aiUnavailable() {
             Page<EvaluationRequest> historyPage = new PageImpl<>(List.of(evalWithAmount500));
-            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L, any()))
+            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L), any()))
                     .thenReturn(historyPage);
             when(ruleRepository.findById(1L)).thenReturn(Optional.of(originalRule));
 
@@ -177,7 +177,7 @@ class RuleSimulationServiceImplTest {
     @DisplayName("should throw RuntimeException when rule not found")
     void simulate_ruleNotFound_throwsRuntime() {
         Page<EvaluationRequest> historyPage = new PageImpl<>(List.of(evalWithAmount500));
-        when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L, any()))
+        when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L), any()))
                 .thenReturn(historyPage);
         when(ruleRepository.findById(999L)).thenReturn(Optional.empty());
 
