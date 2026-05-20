@@ -71,7 +71,8 @@ class TenantServiceImplTest {
         @Test @DisplayName("should throw ConflictException when slug is already taken")
         void create_duplicateSlug_throwsConflict() {
             when(tenantRepository.existsBySlug("bankcorp")).thenReturn(true);
-            assertThatThrownBy(() -> service.create(new CreateTenantRequest("BankCorp", "bankcorp", null)))
+            CreateTenantRequest req = new CreateTenantRequest("BankCorp", "bankcorp", null);
+            assertThatThrownBy(() -> service.create(req))
                     .isInstanceOf(ConflictException.class)
                     .hasMessageContaining("bankcorp");
         }
