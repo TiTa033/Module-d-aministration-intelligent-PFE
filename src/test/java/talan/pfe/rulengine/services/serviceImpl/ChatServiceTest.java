@@ -8,7 +8,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
 import talan.pfe.rulengine.dtos.request.ChatRequest;
 import talan.pfe.rulengine.dtos.response.ChatResponse;
 import talan.pfe.rulengine.entites.*;
@@ -101,7 +100,7 @@ class ChatServiceTest {
 
         @Test
         @DisplayName("should call LLM for in-scope question about rules")
-        void chat_inScope_callsLlm() throws Exception {
+        void chat_inScope_callsLlm()  {
             when(currentUserResolver.requireUser()).thenReturn(userWithTenant);
             when(chatConversationRepository.save(any())).thenReturn(conversation);
             when(chatMessageRepository.save(any())).thenReturn(mock(ChatMessage.class));
@@ -124,7 +123,7 @@ class ChatServiceTest {
 
         @Test
         @DisplayName("should return error message when LLM throws exception")
-        void chat_llmThrows_returnsErrorMessage() throws Exception {
+        void chat_llmThrows_returnsErrorMessage()  {
             when(currentUserResolver.requireUser()).thenReturn(userWithTenant);
             when(chatConversationRepository.save(any())).thenReturn(conversation);
             when(chatMessageRepository.save(any())).thenReturn(mock(ChatMessage.class));

@@ -74,8 +74,6 @@ class RuleSimulationServiceImplTest {
                 .requestedAt(LocalDateTime.now()).build();
     }
 
-    // ─── EMPTY HISTORY ───────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("simulate() with no history")
     class NoHistory {
@@ -84,7 +82,7 @@ class RuleSimulationServiceImplTest {
         @DisplayName("should return zero-result response when no past evaluations exist")
         void simulate_noHistory_returnsZeroResult() {
             Page<EvaluationRequest> emptyPage = new PageImpl<>(List.of());
-            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L), any()))
+            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L, any()))
                     .thenReturn(emptyPage);
 
             SimulationRequest req = buildSimulationRequest();
@@ -96,8 +94,6 @@ class RuleSimulationServiceImplTest {
         }
     }
 
-    // ─── SCORE CALCULATION ───────────────────────────────────────────────────
-
     @Nested
     @DisplayName("simulate() score calculation")
     class ScoreCalculation {
@@ -105,18 +101,15 @@ class RuleSimulationServiceImplTest {
         @Test
         @DisplayName("should detect change when proposed conditions match more evaluations")
         void simulate_proposedConditionsMatchMore_detectsChange() {
-            // History: one eval at 500 (matches >300), one at 200 (does NOT match >300)
             Page<EvaluationRequest> historyPage = new PageImpl<>(
                     List.of(evalWithAmount500, evalWithAmount200));
-            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L), any()))
+            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L, any()))
                     .thenReturn(historyPage);
             when(ruleRepository.findById(1L)).thenReturn(Optional.of(originalRule));
 
-            // Proposed: lower threshold to >100 → both evals now match
             SimulationRequest req = buildSimulationRequest();
-            req.getProposedConditions().get(0).setValue("100"); // GREATER_THAN 100
+            req.getProposedConditions().get(0).setValue("100");
 
-            // Mock Groq AI call chain
             ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
             ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
             when(chatClient.prompt()).thenReturn(requestSpec);
@@ -127,7 +120,6 @@ class RuleSimulationServiceImplTest {
             SimulationResult result = service.simulate(10L, 1L, req);
 
             assertThat(result.getTotalEvaluated()).isEqualTo(2);
-            // eval at 200: was NOT matching (score=0), now IS matching (score=10) → changed
             assertThat(result.getChangedCount()).isGreaterThanOrEqualTo(1);
             assertThat(result.isAiAvailable()).isTrue();
             assertThat(result.getAiAnalysis()).isNotBlank();
@@ -137,11 +129,10 @@ class RuleSimulationServiceImplTest {
         @DisplayName("should report no changes when same conditions produce identical results")
         void simulate_sameConditions_noChange() {
             Page<EvaluationRequest> historyPage = new PageImpl<>(List.of(evalWithAmount500));
-            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L), any()))
+            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L, any()))
                     .thenReturn(historyPage);
             when(ruleRepository.findById(1L)).thenReturn(Optional.of(originalRule));
 
-            // Keep the same threshold >300
             SimulationRequest req = buildSimulationRequest();
 
             ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
@@ -158,8 +149,6 @@ class RuleSimulationServiceImplTest {
         }
     }
 
-    // ─── AI UNAVAILABLE ──────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("simulate() when AI is unavailable")
     class AiUnavailable {
@@ -168,7 +157,7 @@ class RuleSimulationServiceImplTest {
         @DisplayName("should return aiAvailable=false and fallback message when Groq throws")
         void simulate_groqThrows_aiUnavailable() {
             Page<EvaluationRequest> historyPage = new PageImpl<>(List.of(evalWithAmount500));
-            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L), any()))
+            when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L, any()))
                     .thenReturn(historyPage);
             when(ruleRepository.findById(1L)).thenReturn(Optional.of(originalRule));
 
@@ -184,13 +173,11 @@ class RuleSimulationServiceImplTest {
         }
     }
 
-    // ─── RULE NOT FOUND ──────────────────────────────────────────────────────
-
     @Test
     @DisplayName("should throw RuntimeException when rule not found")
     void simulate_ruleNotFound_throwsRuntime() {
         Page<EvaluationRequest> historyPage = new PageImpl<>(List.of(evalWithAmount500));
-        when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L), any()))
+        when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L, any()))
                 .thenReturn(historyPage);
         when(ruleRepository.findById(999L)).thenReturn(Optional.empty());
 
@@ -202,14 +189,12 @@ class RuleSimulationServiceImplTest {
                 .hasMessageContaining("Rule not found");
     }
 
-    // ─── SAMPLE SIZE ─────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("should default sampleSize to 100 when 0 is provided")
     void simulate_zeroSampleSize_defaults100() {
         Page<EvaluationRequest> emptyPage = new PageImpl<>(List.of());
-        when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(eq(1L),
-                eq(PageRequest.of(0, 100)))).thenReturn(emptyPage);
+        when(evaluationRequestRepository.findByTenantIdOrderByRequestedAtDesc(1L,
+                PageRequest.of(0, 100))).thenReturn(emptyPage);
 
         SimulationRequest req = buildSimulationRequest();
         req.setSampleSize(0);
@@ -217,10 +202,8 @@ class RuleSimulationServiceImplTest {
         SimulationResult result = service.simulate(10L, 1L, req);
         assertThat(result.getTotalEvaluated()).isZero();
         verify(evaluationRequestRepository).findByTenantIdOrderByRequestedAtDesc(
-                eq(1L), eq(PageRequest.of(0, 100)));
+                1L, PageRequest.of(0, 100));
     }
-
-    // ─── HELPERS ─────────────────────────────────────────────────────────────
 
     private SimulationRequest buildSimulationRequest() {
         SimulationRequest.ProposedCondition pc = new SimulationRequest.ProposedCondition();

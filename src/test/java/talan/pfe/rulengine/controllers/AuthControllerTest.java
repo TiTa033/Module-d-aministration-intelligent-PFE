@@ -9,7 +9,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import talan.pfe.rulengine.dtos.request.*;
+
 import talan.pfe.rulengine.dtos.response.AuthResponse;
 import talan.pfe.rulengine.security.ApiKeyAuthenticationFilter;
 import talan.pfe.rulengine.security.JwtAuthenticationFilter;

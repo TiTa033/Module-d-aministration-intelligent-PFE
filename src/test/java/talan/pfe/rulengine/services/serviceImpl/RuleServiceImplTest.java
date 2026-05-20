@@ -9,7 +9,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import talan.pfe.rulengine.dtos.request.CreateRuleRequest;
-import talan.pfe.rulengine.dtos.request.UpdateRuleRequest;
 import talan.pfe.rulengine.dtos.response.RuleResponse;
 import talan.pfe.rulengine.entites.Rule;
 import talan.pfe.rulengine.entites.RuleSet;
@@ -47,7 +46,7 @@ class RuleServiceImplTest {
 
     @InjectMocks RuleServiceImpl service;
 
-    private RuleSet activeRuleSet;
+
     private RuleSet draftRuleSet;
     private RuleSet archivedRuleSet;
     private Rule rule;
@@ -60,10 +59,6 @@ class RuleServiceImplTest {
                 .evaluationStrategy(EvaluationStrategy.FIRST_MATCH)
                 .rules(new ArrayList<>()).build();
 
-        activeRuleSet = RuleSet.builder()
-                .id(10L).name("RS").status(RuleSetStatus.ACTIVE)
-                .evaluationStrategy(EvaluationStrategy.FIRST_MATCH)
-                .rules(new ArrayList<>()).build();
 
         archivedRuleSet = RuleSet.builder()
                 .id(10L).name("RS").status(RuleSetStatus.ARCHIVED)

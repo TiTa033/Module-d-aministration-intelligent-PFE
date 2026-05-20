@@ -106,7 +106,9 @@ class TenantServiceImplTest {
             when(tenantRepository.save(any())).thenReturn(tenant);
             when(tenantMapper.toDto(any())).thenReturn(tenantResponse);
             doNothing().when(auditProducer).publish(any(), any(), any(), any(), any(), any(), any(), any());
+
             service.activate(1L);
+
             assertThat(tenant.getStatus()).isEqualTo(TenantStatus.ACTIVE);
         }
 
@@ -114,7 +116,8 @@ class TenantServiceImplTest {
         void activate_alreadyActive_throwsBadRequest() {
             when(tenantRepository.findById(1L)).thenReturn(Optional.of(tenant));
             assertThatThrownBy(() -> service.activate(1L))
-                    .isInstanceOf(BadRequestException.class).hasMessageContaining("already active");
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("already active");
         }
     }
 
@@ -127,7 +130,9 @@ class TenantServiceImplTest {
             when(tenantRepository.save(any())).thenReturn(tenant);
             when(tenantMapper.toDto(any())).thenReturn(tenantResponse);
             doNothing().when(auditProducer).publish(any(), any(), any(), any(), any(), any(), any(), any());
+
             service.deactivate(1L);
+
             assertThat(tenant.getStatus()).isEqualTo(TenantStatus.INACTIVE);
         }
 
@@ -136,7 +141,8 @@ class TenantServiceImplTest {
             tenant.setStatus(TenantStatus.INACTIVE);
             when(tenantRepository.findById(1L)).thenReturn(Optional.of(tenant));
             assertThatThrownBy(() -> service.deactivate(1L))
-                    .isInstanceOf(BadRequestException.class).hasMessageContaining("already inactive");
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("already inactive");
         }
     }
 
@@ -149,7 +155,9 @@ class TenantServiceImplTest {
             when(tenantRepository.countUsersByTenantId(1L)).thenReturn(0L);
             doNothing().when(auditProducer).publish(any(), any(), any(), any(), any(), any(), any(), any());
             doNothing().when(tenantRepository).delete(tenant);
+
             service.delete(1L);
+
             verify(tenantRepository).delete(tenant);
         }
 
@@ -158,7 +166,8 @@ class TenantServiceImplTest {
             when(tenantRepository.findById(1L)).thenReturn(Optional.of(tenant));
             when(tenantRepository.countUsersByTenantId(1L)).thenReturn(3L);
             assertThatThrownBy(() -> service.delete(1L))
-                    .isInstanceOf(BadRequestException.class).hasMessageContaining("3");
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("3");
         }
     }
 
@@ -171,8 +180,10 @@ class TenantServiceImplTest {
             when(tenantRepository.save(any())).thenReturn(tenant);
             when(tenantMapper.toDto(any())).thenReturn(tenantResponse);
             doNothing().when(auditProducer).publish(any(), any(), any(), any(), any(), any(), any(), any());
+
             UpdateTenantRequest req = new UpdateTenantRequest();
             req.setName("NewName");
+
             assertThat(service.update(1L, req)).isNotNull();
             verify(tenantRepository).save(any());
         }

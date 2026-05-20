@@ -57,8 +57,6 @@ class RuleSetSnapshotServiceImplTest {
                 .rules(new ArrayList<>(List.of(rule))).build();
     }
 
-    // ─── toPackage() ─────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("toPackage()")
     class ToPackage {
@@ -69,12 +67,14 @@ class RuleSetSnapshotServiceImplTest {
             RuleSet rs = buildRuleSet();
             RuleSetExportPackage pkg = service.toPackage(rs);
 
-            assertThat(pkg.getName()).isEqualTo("Credit Scoring");
-            assertThat(pkg.getDescription()).isEqualTo("Main scoring ruleset");
-            assertThat(pkg.getEvaluationStrategy()).isEqualTo("FIRST_MATCH");
-            assertThat(pkg.getStatus()).isEqualTo("ACTIVE");
-            assertThat(pkg.getSchemaVersion()).isEqualTo(RuleSetExportPackage.CURRENT_SCHEMA);
-            assertThat(pkg.getRules()).hasSize(1);
+            assertThat(pkg).satisfies(p -> {
+                assertThat(p.getName()).isEqualTo("Credit Scoring");
+                assertThat(p.getDescription()).isEqualTo("Main scoring ruleset");
+                assertThat(p.getEvaluationStrategy()).isEqualTo("FIRST_MATCH");
+                assertThat(p.getStatus()).isEqualTo("ACTIVE");
+                assertThat(p.getSchemaVersion()).isEqualTo(RuleSetExportPackage.CURRENT_SCHEMA);
+                assertThat(p.getRules()).hasSize(1);
+            });
         }
 
         @Test
@@ -84,23 +84,29 @@ class RuleSetSnapshotServiceImplTest {
             RuleSetExportPackage pkg = service.toPackage(rs);
 
             ExportedRuleDto exportedRule = pkg.getRules().get(0);
-            assertThat(exportedRule.getName()).isEqualTo("High Amount");
-            assertThat(exportedRule.getPriority()).isEqualTo(1);
-            assertThat(exportedRule.getLogicOperator()).isEqualTo("AND");
-            assertThat(exportedRule.getScore()).isEqualTo(10);
-            assertThat(exportedRule.getConditions()).hasSize(1);
-            assertThat(exportedRule.getActions()).hasSize(1);
+            assertThat(exportedRule).satisfies(r -> {
+                assertThat(r.getName()).isEqualTo("High Amount");
+                assertThat(r.getPriority()).isEqualTo(1);
+                assertThat(r.getLogicOperator()).isEqualTo("AND");
+                assertThat(r.getScore()).isEqualTo(10);
+                assertThat(r.getConditions()).hasSize(1);
+                assertThat(r.getActions()).hasSize(1);
+            });
 
             ExportedConditionDto cond = exportedRule.getConditions().get(0);
-            assertThat(cond.getField()).isEqualTo("amount");
-            assertThat(cond.getOperator()).isEqualTo("GREATER_THAN");
-            assertThat(cond.getValue()).isEqualTo("1000");
-            assertThat(cond.getValueType()).isEqualTo("NUMBER");
+            assertThat(cond).satisfies(c -> {
+                assertThat(c.getField()).isEqualTo("amount");
+                assertThat(c.getOperator()).isEqualTo("GREATER_THAN");
+                assertThat(c.getValue()).isEqualTo("1000");
+                assertThat(c.getValueType()).isEqualTo("NUMBER");
+            });
 
             ExportedActionDto act = exportedRule.getActions().get(0);
-            assertThat(act.getActionType()).isEqualTo("SET_VALUE");
-            assertThat(act.getOutputKey()).isEqualTo("decision");
-            assertThat(act.getOutputValue()).isEqualTo("APPROVED");
+            assertThat(act).satisfies(a -> {
+                assertThat(a.getActionType()).isEqualTo("SET_VALUE");
+                assertThat(a.getOutputKey()).isEqualTo("decision");
+                assertThat(a.getOutputValue()).isEqualTo("APPROVED");
+            });
         }
 
         @Test
@@ -112,15 +118,13 @@ class RuleSetSnapshotServiceImplTest {
                     .id(2L).name("Low Amount").priority(2)
                     .logicOperator(LogicOperator.AND)
                     .conditions(new ArrayList<>()).actions(new ArrayList<>()).build();
-            rs.getRules().add(0, rule2); // add rule2 first, but priority=2
+            rs.getRules().add(0, rule2);
 
             RuleSetExportPackage pkg = service.toPackage(rs);
-            assertThat(pkg.getRules().get(0).getName()).isEqualTo("High Amount"); // priority=1
-            assertThat(pkg.getRules().get(1).getName()).isEqualTo("Low Amount");  // priority=2
+            assertThat(pkg.getRules().get(0).getName()).isEqualTo("High Amount");
+            assertThat(pkg.getRules().get(1).getName()).isEqualTo("Low Amount");
         }
     }
-
-    // ─── toJson() / parse() round-trip ───────────────────────────────────────
 
     @Nested
     @DisplayName("toJson() and parse() round-trip")
@@ -132,24 +136,23 @@ class RuleSetSnapshotServiceImplTest {
             RuleSet rs = buildRuleSet();
             String json = service.toJson(rs);
 
-            assertThat(json).isNotBlank();
-            assertThat(json).contains("Credit Scoring");
+            assertThat(json).isNotBlank().contains("Credit Scoring");
 
             RuleSetExportPackage parsed = service.parse(json);
-            assertThat(parsed.getName()).isEqualTo("Credit Scoring");
-            assertThat(parsed.getRules()).hasSize(1);
-            assertThat(parsed.getRules().get(0).getName()).isEqualTo("High Amount");
+            assertThat(parsed).satisfies(p -> {
+                assertThat(p.getName()).isEqualTo("Credit Scoring");
+                assertThat(p.getRules()).hasSize(1);
+                assertThat(p.getRules().get(0).getName()).isEqualTo("High Amount");
+            });
         }
 
         @Test
-        @DisplayName("should throw IllegalArgumentException for invalid JSON")
-        void parse_invalidJson_throwsIllegalArgument() {
+        @DisplayName("should throw for invalid JSON")
+        void parse_invalidJson_throws() {
             assertThatThrownBy(() -> service.parse("not-valid-json"))
                     .isInstanceOf(Exception.class);
         }
     }
-
-    // ─── applyPackage() ──────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("applyPackage()")
@@ -159,18 +162,18 @@ class RuleSetSnapshotServiceImplTest {
         @DisplayName("should replace all rules on target RuleSet")
         void applyPackage_replacesRules() {
             RuleSet target = buildRuleSet();
-            // Add extra rule to verify clearing
             target.getRules().add(Rule.builder()
                     .id(99L).name("Old Rule").priority(5)
                     .logicOperator(LogicOperator.OR)
                     .conditions(new ArrayList<>()).actions(new ArrayList<>()).build());
 
-            RuleSetExportPackage pkg = service.toPackage(buildRuleSet()); // fresh pkg with 1 rule
-
+            RuleSetExportPackage pkg = service.toPackage(buildRuleSet());
             service.applyPackage(target, pkg);
 
-            assertThat(target.getRules()).hasSize(1);
-            assertThat(target.getRules().get(0).getName()).isEqualTo("High Amount");
+            assertThat(target.getRules()).satisfies(rules -> {
+                assertThat(rules).hasSize(1);
+                assertThat(rules.get(0).getName()).isEqualTo("High Amount");
+            });
         }
 
         @Test
@@ -194,10 +197,12 @@ class RuleSetSnapshotServiceImplTest {
 
             service.applyPackage(target, pkg);
 
-            assertThat(target.getName()).isEqualTo("Updated RS");
-            assertThat(target.getDescription()).isEqualTo("New desc");
-            assertThat(target.getEvaluationStrategy()).isEqualTo(EvaluationStrategy.ALL_MATCH);
-            assertThat(target.getStatus()).isEqualTo(RuleSetStatus.DRAFT);
+            assertThat(target).satisfies(t -> {
+                assertThat(t.getName()).isEqualTo("Updated RS");
+                assertThat(t.getDescription()).isEqualTo("New desc");
+                assertThat(t.getEvaluationStrategy()).isEqualTo(EvaluationStrategy.ALL_MATCH);
+                assertThat(t.getStatus()).isEqualTo(RuleSetStatus.DRAFT);
+            });
         }
     }
 }

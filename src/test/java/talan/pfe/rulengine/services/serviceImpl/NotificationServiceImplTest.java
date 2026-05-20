@@ -78,7 +78,7 @@ class NotificationServiceImplTest {
     @DisplayName("getUnreadCount() should return 0 when all notifications are read")
     void getUnreadCount_zero() {
         when(notificationRepository.countByTenantIdAndReadFalse(1L)).thenReturn(0L);
-        assertThat(service.getUnreadCount(1L)).isEqualTo(0L);
+        assertThat(service.getUnreadCount(1L)).isZero();
     }
 
     @Test
