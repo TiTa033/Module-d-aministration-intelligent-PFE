@@ -45,28 +45,17 @@ pipeline {
         stage('🔎 SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh """
-                        mvn sonar:sonar \
-                          -Dsonar.projectKey=raas-backend \
-                          -Dsonar.projectName='RaaS Backend' \
-                          -Dsonar.host.url=${SONAR_HOST_URL} \
-                          -Dsonar.token=${SONAR_TOKEN} \
-                          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-                          -Dsonar.coverage.exclusions=\
-        "**/entites/**,\
-        **/dtos/**,\
-        **/mappers/**,\
-        **/enums/**,\
-        **/config/**,\
-        **/exception/**,\
-        **/kafka/**,\
-        **/security/**,\
-        **/repositories/**,\
-        **/scheduler/**,\
-        **/util/**,\
-        **/services/llm/**,\
-        **/*Application.java"
-                    """
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                            mvn sonar:sonar \
+                              -Dsonar.projectKey=raas-backend \
+                              -Dsonar.projectName="RaaS Backend" \
+                              -Dsonar.host.url=http://raas-sonarqube:9000 \
+                              -Dsonar.token=$SONAR_TOKEN \
+                              -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                              -Dsonar.coverage.exclusions="**/entites/**,**/dtos/**,**/mappers/**,**/enums/**,**/config/**,**/exception/**,**/kafka/**,**/security/**,**/repositories/**,**/scheduler/**,**/util/**,**/services/llm/**,**/*Application.java"
+                        '''
+                    }
                 }
             }
         }
