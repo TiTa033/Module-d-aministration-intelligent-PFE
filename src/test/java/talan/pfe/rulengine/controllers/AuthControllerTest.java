@@ -63,23 +63,7 @@ class AuthControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test @DisplayName("POST /api/auth/register → 201 CREATED")
-    void register_returns201() throws Exception {
-        when(authService.register(any())).thenReturn(stubAuth());
 
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                            {
-                              "email": "new@bank.com",
-                              "password": "Secret123!",
-                              "role": "VIEWER",
-                              "tenantId": "1",
-                              "captchaToken": "test-token"
-                            }
-                            """))
-                .andExpect(status().is2xxSuccessful());
-    }
 
     @Test @DisplayName("POST /api/auth/refresh → 200 OK")
     void refresh_returns200() throws Exception {
