@@ -204,6 +204,30 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.11</version>
+                <configuration>
+                    <excludes>
+                        <!-- Entities / domain model -->
+                        <exclude>talan/pfe/rulengine/entites/**</exclude>
+                        <!-- DTOs (requests, responses, export packages) -->
+                        <exclude>talan/pfe/rulengine/dtos/**</exclude>
+                        <!-- MapStruct mappers -->
+                        <exclude>talan/pfe/rulengine/mappers/**</exclude>
+                        <!-- Enums -->
+                        <exclude>talan/pfe/rulengine/enums/**</exclude>
+                        <!-- Spring configuration classes -->
+                        <exclude>talan/pfe/rulengine/config/**</exclude>
+                        <!-- Custom exception classes -->
+                        <exclude>talan/pfe/rulengine/exception/**</exclude>
+                        <!-- Kafka producers/consumers -->
+                        <exclude>talan/pfe/rulengine/kafka/**</exclude>
+                        <!-- Security infrastructure (filters, JWT util, etc.) -->
+                        <exclude>talan/pfe/rulengine/security/**</exclude>
+                        <!-- Repositories (interfaces, no logic to test) -->
+                        <exclude>talan/pfe/rulengine/repositories/**</exclude>
+                        <!-- Spring Boot main application class -->
+                        <exclude>talan/pfe/rulengine/ModuleAdministrationApplication.class</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
