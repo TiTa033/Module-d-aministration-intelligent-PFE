@@ -7,6 +7,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
+import talan.pfe.rulengine.dtos.response.NotificationResponse;
 import talan.pfe.rulengine.dtos.response.PageResponse;
 import talan.pfe.rulengine.security.ApiKeyAuthenticationFilter;
 import talan.pfe.rulengine.security.JwtAuthenticationFilter;
@@ -31,12 +32,17 @@ class NotificationControllerTest {
     @MockBean ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     @MockBean JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    private PageResponse<NotificationResponse> emptyPage() {
+        return PageResponse.<NotificationResponse>builder()
+                .content(List.of()).page(0).size(20)
+                .totalElements(0).totalPages(0).last(true).build();
+    }
+
     @Test @DisplayName("GET /api/notifications → 200 OK")
     void getAll_returns200() throws Exception {
         when(jwtService.extractTenantId("t")).thenReturn("1");
         when(notificationService.getAll(eq(1L), any()))
-                .thenReturn(PageResponse.builder().content(List.of()).page(0).size(20)
-                        .totalElements(0).totalPages(0).last(true).build());
+                .thenReturn(emptyPage());
 
         mockMvc.perform(get("/api/notifications").header("Authorization", "Bearer t"))
                 .andExpect(status().isOk());
@@ -49,8 +55,7 @@ class NotificationControllerTest {
 
         mockMvc.perform(get("/api/notifications/unread-count").header("Authorization", "Bearer t"))
                 .andExpect(status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$.count").value(3));
+                .andExpect(jsonPath("$.count").value(3));
     }
 
     @Test @DisplayName("PATCH /api/notifications/mark-all-read → 204 NO CONTENT")

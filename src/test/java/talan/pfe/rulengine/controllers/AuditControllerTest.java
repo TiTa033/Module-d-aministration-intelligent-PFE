@@ -7,6 +7,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
+import talan.pfe.rulengine.dtos.response.AuditLogResponse;
 import talan.pfe.rulengine.dtos.response.PageResponse;
 import talan.pfe.rulengine.security.ApiKeyAuthenticationFilter;
 import talan.pfe.rulengine.security.JwtAuthenticationFilter;
@@ -31,12 +32,17 @@ class AuditControllerTest {
     @MockBean ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     @MockBean JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    private PageResponse<AuditLogResponse> emptyPage() {
+        return PageResponse.<AuditLogResponse>builder()
+                .content(List.of()).page(0).size(20)
+                .totalElements(0).totalPages(0).last(true).build();
+    }
+
     @Test @DisplayName("GET /api/audit → 200 OK")
     void getAll_returns200() throws Exception {
         when(jwtService.extractTenantId("t")).thenReturn("1");
         when(auditService.getAll(any(), any(), any(), any(), any(), any()))
-                .thenReturn(PageResponse.builder().content(List.of()).page(0).size(20)
-                        .totalElements(0).totalPages(0).last(true).build());
+                .thenReturn(emptyPage());
 
         mockMvc.perform(get("/api/audit").header("Authorization", "Bearer t"))
                 .andExpect(status().isOk());
@@ -46,8 +52,7 @@ class AuditControllerTest {
     void getAll_withFilters_returns200() throws Exception {
         when(jwtService.extractTenantId("t")).thenReturn("1");
         when(auditService.getAll(any(), any(), any(), any(), any(), any()))
-                .thenReturn(PageResponse.builder().content(List.of()).page(0).size(20)
-                        .totalElements(0).totalPages(0).last(true).build());
+                .thenReturn(emptyPage());
 
         mockMvc.perform(get("/api/audit")
                         .header("Authorization", "Bearer t")
