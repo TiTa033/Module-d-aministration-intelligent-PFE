@@ -31,7 +31,7 @@ pipeline {
 
         stage('🧪 Tests') {
             steps {
-                sh 'mvn test'
+                sh 'mvn verify -q'
             }
             post {
                 always {
@@ -40,11 +40,7 @@ pipeline {
             }
         }
 
-        stage('📦 Package') {
-            steps {
-                sh 'mvn package -DskipTests -q'
-            }
-        }
+
 
         stage('🔎 SonarQube Analysis') {
             steps {
