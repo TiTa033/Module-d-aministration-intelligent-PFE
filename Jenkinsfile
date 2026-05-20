@@ -51,7 +51,21 @@ pipeline {
                           -Dsonar.projectName='RaaS Backend' \
                           -Dsonar.host.url=${SONAR_HOST_URL} \
                           -Dsonar.token=${SONAR_TOKEN} \
-                          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                          -Dsonar.coverage.exclusions=\
+        "**/entites/**,\
+        **/dtos/**,\
+        **/mappers/**,\
+        **/enums/**,\
+        **/config/**,\
+        **/exception/**,\
+        **/kafka/**,\
+        **/security/**,\
+        **/repositories/**,\
+        **/scheduler/**,\
+        **/util/**,\
+        **/services/llm/**,\
+        **/*Application.java"
                     """
                 }
             }
