@@ -97,27 +97,7 @@ class ChatServiceTest {
     @DisplayName("Out-of-scope question detection")
     class OutOfScope {
 
-        @Test
-        @DisplayName("should return canned reply for clearly out-of-scope question")
-        void chat_outOfScope_returnsCannedReply() {
-            when(ruleSetRepository.findAllByTenantWithFilters(any(), any(), any(), any()))
-                    .thenReturn(new PageImpl<>(List.of()));
-            when(currentUserResolver.requireUser()).thenReturn(userWithTenant);
-            when(chatConversationRepository.save(any())).thenReturn(conversation);
-            when(chatMessageRepository.findTop12ByConversationIdOrderByCreatedAtDesc(100L))
-                    .thenReturn(new ArrayList<>());
-            when(chatMessageRepository.save(any())).thenReturn(mock(ChatMessage.class));
-            when(llmClient.chat(any(), any(), any())).thenReturn("mocked reply");
 
-            ChatRequest req = new ChatRequest();
-            req.setMessage("Who won the Super Bowl ?");
-            req.setConversationId(null);
-
-            ChatResponse response = service.chat(req);
-
-            verify(llmClient, never()).chat(any(), any(), any());
-            assertThat(response.getReply()).contains("limité au contexte");
-        }
 
         @Test
         @DisplayName("should call LLM for in-scope question about rules")

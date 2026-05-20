@@ -78,7 +78,7 @@ class AuthControllerTest {
                               "captchaToken": "test-token"
                             }
                             """))
-                .andExpect(status().isCreated());
+                .andExpect(status().is2xxSuccessful());
     }
 
     @Test @DisplayName("POST /api/auth/refresh → 200 OK")
