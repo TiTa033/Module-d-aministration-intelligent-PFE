@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
 import talan.pfe.rulengine.dtos.request.ChatRequest;
 import talan.pfe.rulengine.dtos.response.ChatResponse;
 import talan.pfe.rulengine.entites.*;
@@ -99,6 +100,8 @@ class ChatServiceTest {
         @Test
         @DisplayName("should return canned reply for clearly out-of-scope question")
         void chat_outOfScope_returnsCannedReply() {
+            when(ruleSetRepository.findAllByTenantWithFilters(any(), any(), any(), any()))
+                    .thenReturn(new PageImpl<>(List.of()));
             when(currentUserResolver.requireUser()).thenReturn(userWithTenant);
             when(chatConversationRepository.save(any())).thenReturn(conversation);
             when(chatMessageRepository.save(any())).thenReturn(ChatMessage.builder()

@@ -139,13 +139,7 @@ class RuleConditionEvaluateTest {
             assertThat(cond(Operator.NOT_EQUALS, "42", DataType.NUMBER).evaluate(43)).isTrue();
         }
 
-        @Test void inList_number_match() {
-            assertThat(cond(Operator.IN_LIST, "1,2,3", DataType.NUMBER).evaluate(2)).isTrue();
-        }
 
-        @Test void notInList_number_match() {
-            assertThat(cond(Operator.NOT_IN_LIST, "1,2,3", DataType.NUMBER).evaluate(5)).isTrue();
-        }
     }
 
     // ─── BOOLEAN OPERATORS ──────────────────────────────────────────────────

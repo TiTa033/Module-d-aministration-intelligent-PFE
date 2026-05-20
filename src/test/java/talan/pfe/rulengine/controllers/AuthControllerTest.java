@@ -69,9 +69,12 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                Map.of("email", "new@bank.com", "password", "secret123",
-                                        "tenantId", "1", "role", "VIEWER"))))
+                        .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "new@bank.com",
+                        "password", "secret123",
+                        "role", "VIEWER",
+                        "tenantId", "1",
+                        "captchaToken", "test-token"))))
                 .andExpect(status().isCreated());
     }
 
