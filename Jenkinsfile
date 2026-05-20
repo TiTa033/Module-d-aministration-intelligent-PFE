@@ -50,7 +50,8 @@ pipeline {
                           -Dsonar.projectKey=raas-backend \
                           -Dsonar.projectName='RaaS Backend' \
                           -Dsonar.host.url=${SONAR_HOST_URL} \
-                          -Dsonar.token=${SONAR_TOKEN}
+                          -Dsonar.token=${SONAR_TOKEN} \
+                          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
                     """
                 }
             }
