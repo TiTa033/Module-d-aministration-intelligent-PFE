@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -194,12 +193,19 @@ class EvaluationServiceImplTest {
                 .isInstanceOf(Exception.class);
     }
 
+    static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> invalidInputProvider() {
+        return java.util.stream.Stream.of(
+                org.junit.jupiter.params.provider.Arguments.of(
+                        "unknown field", "{\"amount\":500,\"unknown\":\"x\"}", "Unknown field(s)"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                        "missing field", "{}", "Missing field(s)"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                        "wrong type", "{\"amount\":\"not-a-number\"}", "Invalid input type(s)")
+        );
+    }
+
     @ParameterizedTest(name = "{0}")
-    @CsvSource({
-            "unknown field, '{\"amount\":500\\,\"unknown\":\"x\"}', Unknown field(s)",
-            "missing field, '{}',                                   Missing field(s)",
-            "wrong type,    '{\"amount\":\"not-a-number\"}',        Invalid input type(s)"
-    })
+    @org.junit.jupiter.params.provider.MethodSource("invalidInputProvider")
     @DisplayName("should throw BadRequestException for invalid input")
     void evaluate_invalidInput_throws(String scenario, String inputJson, String expectedMsg) {
         Rule rule = buildRule("amount", Operator.GREATER_THAN,
