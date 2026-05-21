@@ -162,9 +162,6 @@ class EvaluationServiceImplTest {
     @DisplayName("should throw BadRequestException when input is not a JSON object")
     void evaluate_inputNotObject_throws() throws Exception {
         when(apiKeyRepository.findById(1L)).thenReturn(Optional.of(apiKey));
-        when(ruleRepository.findAllByRuleSetIdOrderByPriorityAsc(10L))
-                .thenReturn(List.of(buildRule("amount", Operator.GREATER_THAN,
-                        "300", DataType.NUMBER, ActionType.SET_VALUE, "decision", "OK")));
         EvaluateRequest req = new EvaluateRequest();
         req.setInput(objectMapper.readTree("\"not-an-object\""));
         assertThatThrownBy(() -> service.evaluate(req, principal))
