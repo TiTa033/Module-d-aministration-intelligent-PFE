@@ -1,0 +1,419 @@
+{
+  "name": "ExternalDataCollectionAgent",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 6 * * *" }]
+        }
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Schedule (06h quotidien)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "collect-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "name": "Webhook Trigger (manuel)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 500],
+      "webhookId": "collect-agent"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Workflow de collecte démarré",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000003",
+      "name": "Répondre au webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [250, 500]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "period",
+              "name": "period",
+              "value": "={{ $now.format('MMMM yyyy') }}",
+              "type": "string"
+            },
+            {
+              "id": "tavilyKey",
+              "name": "tavilyKey",
+              "value": "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",
+              "type": "string"
+            },
+            {
+              "id": "groqKey",
+              "name": "groqKey",
+              "value": "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",
+              "type": "string"
+            },
+            {
+              "id": "springBootUrl",
+              "name": "springBootUrl",
+              "value": "http://localhost:8086/api/external-analysis/ingest-insight",
+              "type": "string"
+            },
+            {
+              "id": "ingestSecret",
+              "name": "ingestSecret",
+              "value": "raas_n8n_ingest_2026_xK9!qP3@mZ",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000004",
+      "name": "Initialiser variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"api_key\": \"{{ $json.tavilyKey }}\",\n  \"query\": \"central bank interest rate monetary policy decision {{ $json.period }}\",\n  \"max_results\": 5,\n  \"search_depth\": \"advanced\"\n}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000005",
+      "name": "Tavily — Banque Centrale",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "centralBankRaw",
+              "name": "centralBankRaw",
+              "value": "={{ $json.answer ?? '' }}\n={{ $json.results?.map(r => '- ' + r.title + ': ' + (r.content ?? '').substring(0, 300)).join('\\n') ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "period",
+              "name": "period",
+              "value": "={{ $('Initialiser variables').first().json.period }}",
+              "type": "string"
+            },
+            {
+              "id": "tavilyKey",
+              "name": "tavilyKey",
+              "value": "={{ $('Initialiser variables').first().json.tavilyKey }}",
+              "type": "string"
+            },
+            {
+              "id": "groqKey",
+              "name": "groqKey",
+              "value": "={{ $('Initialiser variables').first().json.groqKey }}",
+              "type": "string"
+            },
+            {
+              "id": "springBootUrl",
+              "name": "springBootUrl",
+              "value": "={{ $('Initialiser variables').first().json.springBootUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "ingestSecret",
+              "name": "ingestSecret",
+              "value": "={{ $('Initialiser variables').first().json.ingestSecret }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000006",
+      "name": "Sauvegarder résultat Banque Centrale",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"api_key\": \"{{ $json.tavilyKey }}\",\n  \"query\": \"inflation GDP growth unemployment macroeconomic indicators {{ $json.period }}\",\n  \"max_results\": 5,\n  \"search_depth\": \"advanced\"\n}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000007",
+      "name": "Tavily — Macro-économique",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "macroRaw",
+              "name": "macroRaw",
+              "value": "={{ $json.answer ?? '' }}\n={{ $json.results?.map(r => '- ' + r.title + ': ' + (r.content ?? '').substring(0, 300)).join('\\n') ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "centralBankRaw",
+              "name": "centralBankRaw",
+              "value": "={{ $('Sauvegarder résultat Banque Centrale').first().json.centralBankRaw }}",
+              "type": "string"
+            },
+            {
+              "id": "period",
+              "name": "period",
+              "value": "={{ $('Initialiser variables').first().json.period }}",
+              "type": "string"
+            },
+            {
+              "id": "tavilyKey",
+              "name": "tavilyKey",
+              "value": "={{ $('Initialiser variables').first().json.tavilyKey }}",
+              "type": "string"
+            },
+            {
+              "id": "groqKey",
+              "name": "groqKey",
+              "value": "={{ $('Initialiser variables').first().json.groqKey }}",
+              "type": "string"
+            },
+            {
+              "id": "springBootUrl",
+              "name": "springBootUrl",
+              "value": "={{ $('Initialiser variables').first().json.springBootUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "ingestSecret",
+              "name": "ingestSecret",
+              "value": "={{ $('Initialiser variables').first().json.ingestSecret }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000008",
+      "name": "Sauvegarder résultat Macro",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"api_key\": \"{{ $json.tavilyKey }}\",\n  \"query\": \"banking sector fintech credit risk financial regulation {{ $json.period }}\",\n  \"max_results\": 5,\n  \"search_depth\": \"advanced\"\n}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000009",
+      "name": "Tavily — Sectoriel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Sauvegarder résultat Macro').first().json;\nconst period = prev.period;\nconst centralBank = prev.centralBankRaw || '';\nconst macro = prev.macroRaw || '';\nconst sectoriel = ($input.first().json.answer ?? '') + '\\n' +\n  ($input.first().json.results?.map(r => '- ' + r.title + ': ' + (r.content ?? '').substring(0, 300)).join('\\n') ?? '');\n\nconst systemPrompt = `Tu es un analyste financier expert. Tu analyses les données macro-économiques\net sectorielles pour aider les équipes de gestion des risques à adapter leurs règles métier.\nRéponds uniquement en français, de façon claire, structurée et orientée décision.`;\n\nconst userPrompt = `PÉRIODE D'ANALYSE : ${period}\\n\\n` +\n  `=== Banque Centrale ===\\n${centralBank.substring(0, 1500)}\\n\\n` +\n  `=== Macro-économique ===\\n${macro.substring(0, 1500)}\\n\\n` +\n  `=== Sectoriel ===\\n${sectoriel.substring(0, 1500)}\\n\\n` +\n  `STRUCTURE DE L'ANALYSE ATTENDUE :\\n\\n` +\n  `[1. RÉSUMÉ EXÉCUTIF]\\nPoints clés pour les décideurs (3-4 bullet points)\\n\\n` +\n  `[2. IMPACT BANQUE CENTRALE]\\n- Décisions de politique monétaire et impact sur les règles de scoring crédit\\n\\n` +\n  `[3. INDICATEURS MACRO-ÉCONOMIQUES]\\n- Tendances inflation / croissance / emploi et implications pour les règles de risque\\n\\n` +\n  `[4. ANALYSE SECTORIELLE]\\n- Évolutions réglementaires ou sectorielles et recommandations d'ajustement\\n\\n` +\n  `[5. RECOMMANDATIONS CONCRÈTES]\\n- 3 actions spécifiques pour adapter les règles métier\\n\\nSois factuel, précis et orienté vers l'action métier.`;\n\nreturn [{\n  json: {\n    systemPrompt,\n    userPrompt,\n    period,\n    centralBank: centralBank.substring(0, 500),\n    macro: macro.substring(0, 500),\n    sectoriel: sectoriel.substring(0, 500),\n    groqKey: prev.groqKey,\n    springBootUrl: prev.springBootUrl,\n    ingestSecret: prev.ingestSecret\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000010",
+      "name": "Construire le prompt LLM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.groqKey }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 1500,\n  \"messages\": [\n    { \"role\": \"system\", \"content\": \"{{ $json.systemPrompt }}\" },\n    { \"role\": \"user\",   \"content\": \"{{ $json.userPrompt }}\" }\n  ]\n}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000011",
+      "name": "Groq — Générer l'analyse",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2600, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const llmResponse = $input.first().json;\nconst promptData = $('Construire le prompt LLM').first().json;\n\nconst analysis = llmResponse.choices?.[0]?.message?.content ?? '';\nconst period = promptData.period;\nconst title = `Analyse Externe – ${period} [Banque Centrale · Macro-éco · Sectoriel] (via n8n)`;\n\nreturn [{\n  json: {\n    title,\n    description: analysis.substring(0, 2000),\n    confidence: 0.85,\n    period,\n    sources: ['Tavily Web Search', 'Groq / GPT-OSS-120b', 'Banque Centrale', 'Macro-éco', 'Sectoriel'],\n    springBootUrl: promptData.springBootUrl,\n    ingestSecret: promptData.ingestSecret\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000012",
+      "name": "Formater le payload Spring Boot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.springBootUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-N8n-Ingest-Secret", "value": "={{ $json.ingestSecret }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"{{ $json.title }}\",\n  \"description\": \"{{ $json.description }}\",\n  \"confidence\": {{ $json.confidence }},\n  \"period\": \"{{ $json.period }}\",\n  \"sources\": {{ JSON.stringify($json.sources) }}\n}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000013",
+      "name": "POST → Spring Boot /ingest-insight",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3200, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "status-ok",
+              "leftValue": "={{ $response.statusCode }}",
+              "rightValue": 202,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000014",
+      "name": "Succès ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3500, 300]
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-0001-0001-000000000015",
+      "name": "✅ Insight sauvegardé",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [3800, 200]
+    },
+    {
+      "parameters": {
+        "errorMessage": "=Spring Boot a refusé l'insight (HTTP {{ $response.statusCode }}) — vérifier X-N8n-Ingest-Secret et les logs."
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000016",
+      "name": "❌ Erreur ingestion",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [3800, 420]
+    },
+    {
+      "parameters": {
+        "content": "## 🤖 ExternalDataCollectionAgent — n8n fait tout\n\n**Flux :**\n1. Déclenchement (schedule 06h ou webhook)\n2. Tavily × 3 (Banque Centrale / Macro-éco / Sectoriel)\n3. Groq Llama3-70b → rapport structuré en français\n4. POST vers Spring Boot `/api/external-analysis/ingest-insight`\n\n**Config Spring Boot :**\n```\nn8n.collect.webhook-url=http://localhost:5678/webhook/collect-agent\nn8n.ingest.secret=raas_n8n_ingest_2026_xK9!qP3@mZ\n```\n\n**Activer la délégation :**\nMaintenant que `n8n.collect.webhook-url` est renseigné, le bouton\n\"Déclencher la collecte\" dans le frontend appellera ce workflow.",
+        "height": 320,
+        "width": 480
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000017",
+      "name": "📋 Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, 0]
+    }
+  ],
+  "connections": {
+    "Schedule (06h quotidien)": {
+      "main": [[{ "node": "Initialiser variables", "type": "main", "index": 0 }]]
+    },
+    "Webhook Trigger (manuel)": {
+      "main": [
+        [
+          { "node": "Répondre au webhook",  "type": "main", "index": 0 },
+          { "node": "Initialiser variables", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Initialiser variables": {
+      "main": [[{ "node": "Tavily — Banque Centrale", "type": "main", "index": 0 }]]
+    },
+    "Tavily — Banque Centrale": {
+      "main": [[{ "node": "Sauvegarder résultat Banque Centrale", "type": "main", "index": 0 }]]
+    },
+    "Sauvegarder résultat Banque Centrale": {
+      "main": [[{ "node": "Tavily — Macro-économique", "type": "main", "index": 0 }]]
+    },
+    "Tavily — Macro-économique": {
+      "main": [[{ "node": "Sauvegarder résultat Macro", "type": "main", "index": 0 }]]
+    },
+    "Sauvegarder résultat Macro": {
+      "main": [[{ "node": "Tavily — Sectoriel", "type": "main", "index": 0 }]]
+    },
+    "Tavily — Sectoriel": {
+      "main": [[{ "node": "Construire le prompt LLM", "type": "main", "index": 0 }]]
+    },
+    "Construire le prompt LLM": {
+      "main": [[{ "node": "Groq — Générer l'analyse", "type": "main", "index": 0 }]]
+    },
+    "Groq — Générer l'analyse": {
+      "main": [[{ "node": "Formater le payload Spring Boot", "type": "main", "index": 0 }]]
+    },
+    "Formater le payload Spring Boot": {
+      "main": [[{ "node": "POST → Spring Boot /ingest-insight", "type": "main", "index": 0 }]]
+    },
+    "POST → Spring Boot /ingest-insight": {
+      "main": [[{ "node": "Succès ?", "type": "main", "index": 0 }]]
+    },
+    "Succès ?": {
+      "main": [
+        [{ "node": "✅ Insight sauvegardé", "type": "main", "index": 0 }],
+        [{ "node": "❌ Erreur ingestion",   "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "active": true,
+  "meta": { "instanceId": "raas-n8n-collect-agent-v1" }
+}

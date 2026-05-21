@@ -113,6 +113,24 @@
       word-break: break-word;
     }
     code { font-family: ui-monospace, monospace; }
+    .mt { margin-top: 1rem; }
+    .sectionList {
+      margin-top: 0.75rem;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      padding: 0.75rem;
+      display: grid;
+      gap: 0.6rem;
+    }
+    .sectionItem {
+      border: 2px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 0.65rem;
+      background: #f8fafc;
+    }
+    .sectionItem b { display: block; margin-bottom: 0.25rem; }
+    .small { font-size: 0.82rem; color: var(--muted); }
   </style>
 </head>
 <body>
@@ -160,10 +178,61 @@
     <pre id="out">(vide)</pre>
   </div>
 
+  <div class="card mt">
+    <div class="cardHead">
+      <div>
+        <h1>Robot IA (Présentation vidéo)</h1>
+        <p class="sub">POST <code>/api/voice-assistant/presentation</code> + narration vocale auto</p>
+      </div>
+      <div class="pill"><b>LLM</b> script dynamique FR</div>
+    </div>
+    <div class="cardBody">
+      <label>Authorization Bearer Token</label>
+      <input id="bearerToken" type="password" autocomplete="off" placeholder="eyJhbGciOi..."/>
+      <div class="hint">Endpoint sécurisé (roles: GLOBAL_ADMIN/ADMIN/MANAGER/VIEWER).</div>
+
+      <div class="row">
+        <div>
+          <label>Niveau audience</label>
+          <select id="audienceLevel">
+            <option value="BEGINNER" selected>BEGINNER</option>
+            <option value="INTERMEDIATE">INTERMEDIATE</option>
+            <option value="EXPERT">EXPERT</option>
+          </select>
+        </div>
+        <div>
+          <label>Langue</label>
+          <input id="presentationLang" type="text" value="fr-FR"/>
+        </div>
+      </div>
+
+      <label>
+        <input id="includeLifecycle" type="checkbox" checked style="width:auto; margin-right:0.35rem"/>
+        Inclure le cycle RuleSet (créer / activer / désactiver)
+      </label>
+
+      <div class="actions">
+        <button type="button" id="generatePresentation">Générer présentation IA</button>
+        <button type="button" id="speakPresentation" class="secondary">Parler (robot)</button>
+        <button type="button" id="stopPresentation" class="secondary">Stop voix</button>
+        <span id="presentationStatus" class="statusBox" style="display:none"></span>
+      </div>
+
+      <div id="presentationMeta" class="hint"></div>
+      <div id="presentationSections" class="sectionList">
+        <div class="small">Aucune présentation générée.</div>
+      </div>
+    </div>
+    <pre id="presentationJson">(vide)</pre>
+  </div>
+
   <script>
     const $ = (id) => document.getElementById(id);
     const baseKey = 'Rulengine_playground_api_key';
+    const bearerKey = 'Rulengine_playground_bearer_token';
     $('apiKey').value = localStorage.getItem(baseKey) || '';
+    $('bearerToken').value = localStorage.getItem(bearerKey) || '';
+    let latestPresentation = null;
 
     function setStatus(kind, text) {
       const el = $('status');
@@ -176,6 +245,35 @@
       el.style.display = 'inline-block';
       el.textContent = text;
       el.className = 'statusBox ' + (kind || '');
+    }
+    function setPresentationStatus(kind, text) {
+      const el = $('presentationStatus');
+      if (!text) {
+        el.style.display = 'none';
+        el.textContent = '';
+        el.className = 'statusBox';
+        return;
+      }
+      el.style.display = 'inline-block';
+      el.textContent = text;
+      el.className = 'statusBox ' + (kind || '');
+    }
+
+    function renderPresentation(data) {
+      if (!data || !Array.isArray(data.sections)) {
+        $('presentationMeta').textContent = '';
+        $('presentationSections').innerHTML = '<div class="small">Aucune présentation générée.</div>';
+        return;
+      }
+      $('presentationMeta').textContent = `${data.title || 'Présentation'} — durée estimée: ${data.totalEstimatedSeconds || '?'}s`;
+      $('presentationSections').innerHTML = data.sections.map((section, idx) => `
+        <div class="sectionItem">
+          <b>${idx + 1}. ${section.title || '(sans titre)'}</b>
+          <div>${section.speechText || ''}</div>
+          <div class="small">Visuel: ${section.visualCue || '-'}</div>
+          <div class="small">Durée estimée: ${section.estimatedSeconds || '?'}s</div>
+        </div>
+      `).join('');
     }
 
     $('format').onclick = () => {
@@ -237,6 +335,79 @@
         $('ruleSetInfo').value = '(indisponible)';
         $('out').textContent = '(vide)';
       }
+    };
+
+    $('generatePresentation').onclick = async () => {
+      const base = $('baseUrl').value.replace(/\/$/, '');
+      const token = $('bearerToken').value.trim();
+      if (token) localStorage.setItem(bearerKey, token);
+      const payload = {
+        includeRulesetLifecycle: $('includeLifecycle').checked,
+        audienceLevel: $('audienceLevel').value,
+        language: $('presentationLang').value.trim() || 'fr-FR'
+      };
+
+      setPresentationStatus('', '');
+      $('presentationJson').textContent = 'Chargement…';
+      try {
+        const res = await fetch(base + '/api/voice-assistant/presentation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? ('Bearer ' + token) : ''
+          },
+          body: JSON.stringify(payload)
+        });
+        const text = await res.text();
+        let json = null;
+        try { json = JSON.parse(text); } catch (_) {}
+        const ok = res.status >= 200 && res.status < 300;
+        setPresentationStatus(ok ? 'ok' : 'err', res.status + ' ' + res.statusText);
+        latestPresentation = json;
+        $('presentationJson').textContent = json ? JSON.stringify(json, null, 2) : text;
+        renderPresentation(json);
+      } catch (e) {
+        setPresentationStatus('err', 'Erreur réseau: ' + e.message);
+        $('presentationJson').textContent = '(vide)';
+        renderPresentation(null);
+      }
+    };
+
+    $('speakPresentation').onclick = async () => {
+      if (!latestPresentation) {
+        setPresentationStatus('err', 'Génère d abord la présentation IA.');
+        return;
+      }
+      const synth = window.speechSynthesis;
+      if (!synth) {
+        setPresentationStatus('err', 'Synthèse vocale non supportée sur ce navigateur.');
+        return;
+      }
+      synth.cancel();
+
+      const parts = [];
+      if (latestPresentation.introSpeech) parts.push(latestPresentation.introSpeech);
+      (latestPresentation.sections || []).forEach((s, idx) => {
+        parts.push(`Section ${idx + 1}. ${s.title || ''}. ${s.speechText || ''}`);
+      });
+      if (latestPresentation.outroSpeech) parts.push(latestPresentation.outroSpeech);
+
+      const text = parts.join(' ');
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = latestPresentation.language || 'fr-FR';
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.onstart = () => setPresentationStatus('ok', 'Le robot est en train de parler…');
+      utterance.onend = () => setPresentationStatus('ok', 'Lecture terminée.');
+      utterance.onerror = () => setPresentationStatus('err', 'Erreur pendant la lecture vocale.');
+      synth.speak(utterance);
+    };
+
+    $('stopPresentation').onclick = () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setPresentationStatus('', '');
     };
   </script>
 </body>

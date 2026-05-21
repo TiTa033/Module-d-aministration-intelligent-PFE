@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.enums.RuleSetStatus;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -19,6 +20,8 @@ public interface RuleSetRepository extends JpaRepository<RuleSet, Long> {
     boolean existsByNameAndTenantIdAndIdNot(String name, Long tenantId, Long id);
 
     Optional<RuleSet> findByIdAndTenantId(Long id, Long tenantId);
+
+    List<RuleSet> findAllByTenantId(Long tenantId);
 
     @Query("SELECT r FROM RuleSet r WHERE r.tenant.id = :tenantId " +
             "AND (:search = '' OR LOWER(r.name) LIKE LOWER(CONCAT('%', :search, '%'))) " +

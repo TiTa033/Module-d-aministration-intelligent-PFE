@@ -21,7 +21,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@Tag(name = "AI Insights", description = "Generated AI documentation and validation workflow")
+@Tag(name = "Documentation IA", description = "Documentation générée par IA et validation (hors détail technique RuleSet)")
 public class AiInsightController {
 
     private final AiInsightService aiInsightService;

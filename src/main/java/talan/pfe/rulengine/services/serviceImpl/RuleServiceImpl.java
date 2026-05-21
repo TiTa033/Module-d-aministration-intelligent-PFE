@@ -20,6 +20,8 @@ import talan.pfe.rulengine.repositories.RuleRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.security.CurrentUserResolver;
 import talan.pfe.rulengine.services.RuleService;
+import talan.pfe.rulengine.services.RuleConditionService;
+import talan.pfe.rulengine.services.RuleActionService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,6 +37,8 @@ public class RuleServiceImpl implements RuleService {
     private final AuditProducer auditProducer;
     private final CurrentUserResolver currentUserResolver;
     private final NotificationProducer notificationProducer;
+    private final RuleConditionService ruleConditionService;
+    private final RuleActionService ruleActionService;
 
     @Override
     @Transactional

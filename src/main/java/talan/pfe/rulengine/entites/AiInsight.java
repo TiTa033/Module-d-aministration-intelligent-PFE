@@ -68,7 +68,7 @@ public class AiInsight {
     @Column(name = "confidence", nullable = false)
     private Float confidence;
 
-    @Column(name = "generated_at", nullable = false, updatable = false)
+    @Column(name = "generated_at", nullable = false)
     private LocalDateTime generatedAt;
 
     @Column(name = "resolved_at")

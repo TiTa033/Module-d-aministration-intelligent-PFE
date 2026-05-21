@@ -1,0 +1,192 @@
+{
+  "name": "RuleSet Activation Notifier",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ruleset-activated",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b2c3d4e5-0002-0001-0001-000000000001",
+      "name": "Webhook — RuleSet Activated",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "ruleset-activated"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"received\", \"event\": \"{{ $json.body.event }}\" }",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "b2c3d4e5-0002-0001-0001-000000000002",
+      "name": "Répondre 200 au webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "secret-check",
+              "leftValue": "={{ $json.headers['x-webhook-secret'] }}",
+              "rightValue": "raas_n8n_secret_2026_9xK!pL7@aQ",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b2c3d4e5-0002-0001-0001-000000000003",
+      "name": "Secret valide ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\n\nconst ruleSetId     = body.ruleSetId     ?? 'N/A';\nconst ruleSetName   = body.ruleSetName   ?? 'N/A';\nconst tenantName    = body.tenantName    ?? 'N/A';\nconst status        = body.status        ?? 'ACTIVE';\nconst version       = body.version       ?? '1';\nconst strategy      = body.strategy      ?? 'N/A';\nconst activatedBy   = body.activatedBy   ?? 'Système';\nconst activatedAt   = body.activatedAt   ?? new Date().toISOString();\nconst recipientsCsv = body.tenantMemberEmailsCsv ?? '';\nconst recipientList = (body.tenantMemberEmails ?? []).filter(e => e && e.length > 0);\n\nconst formatDate = (iso) => {\n  try {\n    return new Date(iso).toLocaleString('fr-FR', { timeZone: 'Africa/Tunis' });\n  } catch { return iso; }\n};\n\nconst strategyLabel = {\n  FIRST_MATCH: 'Premier match',\n  ALL_MATCH:   'Tous les matches',\n  WEIGHTED:    'Pondéré',\n  PRIORITY:    'Priorité'\n}[strategy] ?? strategy;\n\nconst subject = `[RaaS] RuleSet « ${ruleSetName} » activé — ${tenantName}`;\n\nconst htmlBody = `<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n  <meta charset=\"UTF-8\">\n  <style>\n    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }\n    .card { background: #ffffff; border-radius: 8px; max-width: 600px;\n            margin: 0 auto; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }\n    .badge { display: inline-block; background: #16a34a; color: #fff;\n             font-size: 12px; font-weight: 700; padding: 3px 10px;\n             border-radius: 999px; letter-spacing: .5px; }\n    h1 { color: #1a1a2e; font-size: 20px; margin: 16px 0 4px; }\n    .subtitle { color: #6b7280; font-size: 14px; margin-bottom: 24px; }\n    table { width: 100%; border-collapse: collapse; font-size: 14px; }\n    td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }\n    td:first-child { color: #6b7280; width: 40%; }\n    td:last-child { color: #111827; font-weight: 600; }\n    .footer { margin-top: 28px; font-size: 12px; color: #9ca3af; text-align: center; }\n    .cta { display: block; margin: 24px auto 0; padding: 12px 28px;\n           background: #1a1a2e; color: #fff; text-decoration: none;\n           border-radius: 6px; font-size: 14px; font-weight: 600;\n           text-align: center; max-width: 200px; }\n  </style>\n</head>\n<body>\n  <div class=\"card\">\n    <span class=\"badge\">ACTIVÉ</span>\n    <h1>Un nouveau RuleSet est actif</h1>\n    <p class=\"subtitle\">Ce RuleSet a été activé dans votre espace tenant et est désormais opérationnel.</p>\n    <table>\n      <tr><td>Nom du RuleSet</td><td>${ruleSetName}</td></tr>\n      <tr><td>Identifiant</td><td>#${ruleSetId}</td></tr>\n      <tr><td>Tenant</td><td>${tenantName}</td></tr>\n      <tr><td>Version</td><td>v${version}</td></tr>\n      <tr><td>Stratégie</td><td>${strategyLabel}</td></tr>\n      <tr><td>Statut</td><td>${status}</td></tr>\n      <tr><td>Activé par</td><td>${activatedBy}</td></tr>\n      <tr><td>Date d'activation</td><td>${formatDate(activatedAt)}</td></tr>\n    </table>\n    <a class=\"cta\" href=\"http://localhost:4200/rulesets/${ruleSetId}\">Voir le RuleSet</a>\n    <p class=\"footer\">Notification automatique — RaaS (Rule as a Service) · ${tenantName}</p>\n  </div>\n</body>\n</html>`;\n\nconst textBody = `RuleSet activé : ${ruleSetName}\\nTenant : ${tenantName}\\nVersion : v${version}\\nStratégie : ${strategyLabel}\\nActivé par : ${activatedBy}\\nDate : ${formatDate(activatedAt)}\\n\\nConnectez-vous à http://localhost:4200/rulesets/${ruleSetId} pour le consulter.`;\n\nreturn [{\n  json: {\n    subject,\n    htmlBody,\n    textBody,\n    recipientsCsv,\n    recipientList,\n    ruleSetId,\n    ruleSetName,\n    tenantName,\n    activatedBy,\n    activatedAt: formatDate(activatedAt)\n  }\n}];"
+      },
+      "id": "b2c3d4e5-0002-0001-0001-000000000004",
+      "name": "Construire le contenu email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "has-recipients",
+              "leftValue": "={{ $json.recipientsCsv }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b2c3d4e5-0002-0001-0001-000000000005",
+      "name": "Destinataires présents ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1000, 180]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@raas.talan.com",
+        "toEmail": "={{ $json.recipientsCsv }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.htmlBody }}",
+        "options": {
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "b2c3d4e5-0002-0001-0001-000000000006",
+      "name": "Envoyer email aux membres",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1250, 100],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-raas",
+          "name": "SMTP RaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Construire le contenu email').first().json;\nconsole.log(`[RuleSet Notifier] Aucun destinataire pour RuleSet #${data.ruleSetId} (${data.ruleSetName}) — activation enregistrée sans notification email.`);\nreturn [{ json: { skipped: true, reason: 'no_recipients', ruleSetId: data.ruleSetId } }];"
+      },
+      "id": "b2c3d4e5-0002-0001-0001-000000000007",
+      "name": "Log — Aucun destinataire",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 280]
+    },
+    {
+      "parameters": {},
+      "id": "b2c3d4e5-0002-0001-0001-000000000008",
+      "name": "✅ Notification(s) envoyée(s)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1500, 100]
+    },
+    {
+      "parameters": {},
+      "id": "b2c3d4e5-0002-0001-0001-000000000009",
+      "name": "✅ Activation loguée (sans email)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1500, 280]
+    },
+    {
+      "parameters": {
+        "errorMessage": "=Accès refusé — X-Webhook-Secret invalide ou absent. Vérifiez n8n.webhook.secret dans application.properties."
+      },
+      "id": "b2c3d4e5-0002-0001-0001-000000000010",
+      "name": "❌ Secret invalide",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [750, 420]
+    },
+    {
+      "parameters": {
+        "content": "## 🔔 RuleSet Activation Notifier\n\n**Déclenchement :**  \nSpring Boot envoie un POST vers ce webhook à chaque activation de RuleSet.\n\n**Payload reçu (JSON) :**\n```json\n{\n  \"event\":               \"RULESET_ACTIVATED\",\n  \"ruleSetId\":           42,\n  \"ruleSetName\":         \"Scoring Crédit v3\",\n  \"tenantId\":            7,\n  \"tenantName\":          \"Banque Alpha\",\n  \"status\":              \"ACTIVE\",\n  \"version\":             3,\n  \"strategy\":            \"FIRST_MATCH\",\n  \"activatedBy\":         \"admin@alpha.com\",\n  \"activatedAt\":         \"2026-05-21T10:30:00\",\n  \"tenantMemberEmails\":  [\"user1@alpha.com\", \"user2@alpha.com\"],\n  \"tenantMemberEmailsCsv\": \"user1@alpha.com,user2@alpha.com\"\n}\n```\n\n**Config Spring Boot requise :**\n```properties\nn8n.webhook.enabled=true\nn8n.webhook.url=http://localhost:5678/webhook/ruleset-activated\nn8n.webhook.secret=raas_n8n_secret_2026_9xK!pL7@aQ\n```\n\n**Credential SMTP à créer dans n8n :**  \nSettings → Credentials → New → SMTP  \nNom : `SMTP RaaS`  \nHost : votre serveur SMTP (ex. smtp.gmail.com:587)",
+        "height": 500,
+        "width": 520
+      },
+      "id": "b2c3d4e5-0002-0001-0001-000000000011",
+      "name": "📋 Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-250, 0]
+    }
+  ],
+  "connections": {
+    "Webhook — RuleSet Activated": {
+      "main": [
+        [
+          { "node": "Répondre 200 au webhook",  "type": "main", "index": 0 },
+          { "node": "Secret valide ?",           "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Secret valide ?": {
+      "main": [
+        [{ "node": "Construire le contenu email", "type": "main", "index": 0 }],
+        [{ "node": "❌ Secret invalide",          "type": "main", "index": 0 }]
+      ]
+    },
+    "Construire le contenu email": {
+      "main": [[{ "node": "Destinataires présents ?", "type": "main", "index": 0 }]]
+    },
+    "Destinataires présents ?": {
+      "main": [
+        [{ "node": "Envoyer email aux membres",    "type": "main", "index": 0 }],
+        [{ "node": "Log — Aucun destinataire",     "type": "main", "index": 0 }]
+      ]
+    },
+    "Envoyer email aux membres": {
+      "main": [[{ "node": "✅ Notification(s) envoyée(s)", "type": "main", "index": 0 }]]
+    },
+    "Log — Aucun destinataire": {
+      "main": [[{ "node": "✅ Activation loguée (sans email)", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "meta": { "instanceId": "raas-n8n-ruleset-activation-v1" }
+}

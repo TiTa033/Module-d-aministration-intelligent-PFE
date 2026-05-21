@@ -1,0 +1,15 @@
+databaseChangeLog:
+  # Changelog spécifique Docker :
+  # JPA (ddl-auto=update) crée le schéma complet.
+  # Liquibase se charge uniquement d'insérer les données de démo.
+  # Les changesets de seed ont tous des preConditions (onFail: MARK_RAN)
+  # donc ils sont idempotents et ne cassent rien si les tables sont vides ou déjà peuplées.
+
+  - include:
+      file: db/changelog/changes/004-seed-demo-data.yaml
+
+  - include:
+      file: db/changelog/changes/008-seed-swagger-demo.yaml
+
+  - include:
+      file: db/changelog/changes/015-seed-multi-rulesets-with-conditions-actions.yaml

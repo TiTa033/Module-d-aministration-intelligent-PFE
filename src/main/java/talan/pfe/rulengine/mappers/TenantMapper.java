@@ -6,7 +6,8 @@ import talan.pfe.rulengine.entites.Tenant;
 
 import java.util.List;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring",
+        unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface TenantMapper {
 
     @Mapping(source = "status", target = "status",

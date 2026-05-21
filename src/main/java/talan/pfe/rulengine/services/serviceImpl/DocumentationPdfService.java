@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import talan.pfe.rulengine.entites.AiInsight;
-import talan.pfe.rulengine.entites.Rule;
 import talan.pfe.rulengine.entites.RuleSet;
 import talan.pfe.rulengine.entites.RuleSetVersion;
 import talan.pfe.rulengine.enums.InsightType;
@@ -33,6 +32,7 @@ public class DocumentationPdfService {
     private final RuleSetRepository ruleSetRepository;
     private final AiInsightRepository aiInsightRepository;
     private final RuleSetVersionRepository ruleSetVersionRepository;
+    private final PlatformGuideAgent platformGuideAgent;
 
     @Transactional(readOnly = true)
     public byte[] buildRuleSetDocumentationPdf(Long ruleSetId, Long tenantId) {
@@ -43,81 +43,13 @@ public class DocumentationPdfService {
                         ruleSetId, tenantId, InsightType.DOCUMENTATION_GENERATED)
                 .orElseThrow(() -> new ResourceNotFoundException("Aucune documentation IA trouvée."));
 
-        for (Rule r : ruleSet.getRules()) {
-            r.getConditions().size();
-            r.getActions().size();
-        }
-
         List<RuleSetVersion> versions = ruleSetVersionRepository.findByRuleSetIdOrderByVersionNumberDesc(ruleSetId);
         String html = buildRuleSetPdfHtml(ruleSet, insight, versions);
         return renderHtmlPdfWithFallback(html, "Documentation IA du RuleSet", insight.getDescription());
     }
 
     public byte[] buildEngineGuidePdf() {
-        String content = """
-                Guide pratique — Utiliser le moteur de regles (RaaS)
-                Conversion = d
-                Flags = #
-
-                1) Preparer le contexte metier
-                # Conversion d: clarifier l'objectif metier et les donnees d'entree/sortie.
-                - Identifiez le cas d'usage (scoring credit, KYC, eligibility, anti-fraude...).
-                - Listez les champs d'entree attendus (amount, age, country, etc.) avec leurs types.
-                - Definissez la decision attendue en sortie (APPROVED, REJECTED, REVIEW, score).
-
-                2) Creer un RuleSet propre
-                # Conversion d: transformer le besoin metier en configuration RuleSet exploitable.
-                - Ouvrez RuleSets > Nouveau RuleSet.
-                - Donnez un nom metier explicite et une description orientee usage.
-                - Choisissez la strategie:
-                  * FIRST_MATCH: premiere regle validee = decision finale.
-                  * ALL_MATCH: toutes les regles valides sont appliquees.
-                  * SCORE_BASED: accumulation d'un score global.
-                - Gardez le RuleSet en DRAFT tant que les tests ne sont pas termines.
-
-                3) Concevoir des regles robustes
-                # Conversion d: decomposer chaque decision en regles, conditions et actions.
-                - Pour chaque regle, renseignez:
-                  * priorite (ordre d'evaluation),
-                  * logique (AND/OR),
-                  * score (si SCORE_BASED),
-                  * conditions et actions.
-                - Conditions: champ + operateur + valeur + type coherent.
-                - Actions: sortie claire (decision, flag, score, valeur metier).
-                - Evitez les chevauchements de regles contradictoires.
-
-                4) Tester avant activation
-                # Conversion d: verifier que la logique metier produise la bonne sortie.
-                - Utilisez le playground avec une cle API liee au RuleSet.
-                - Testez des cas nominaux + cas limites + cas invalides.
-                - Verifiez:
-                  * la strategie reellement appliquee,
-                  * les regles matchees,
-                  * la sortie produite.
-                - Corrigez en DRAFT jusqu'a stabilite.
-
-                5) Activer et versionner
-                # Conversion d: passer de la conception a l'execution gouvernee en production.
-                - Activez le RuleSet uniquement apres validation metier.
-                - A chaque activation/restauration, une version est tracée.
-                - La documentation IA est generee automatiquement et peut etre acceptee/rejetee.
-
-                6) Exploitation en production
-                # Flags #: surveiller les signaux de risque et les anomalies operationnelles.
-                - Surveillez l'historique des evaluations pour detecter anomalies.
-                - Consultez les logs d'audit pour la tracabilite.
-                - Faites evoluer les regles par petites iterations versionnees.
-                - Revoquez les cles API non utilisees et limitez les acces par role.
-
-                7) Bonnes pratiques avancees
-                # Flags #: maintenir la qualite, la lisibilite et la maintenabilite des regles.
-                - Un RuleSet = un objectif metier clair.
-                - Utilisez des noms de regles orientés intention (ex: "Revenu minimum credit").
-                - Gardez les conditions atomiques et lisibles.
-                - Documentez chaque changement de version avec une note de changement.
-                - Maintenez un cycle: concevoir -> tester -> activer -> observer -> ameliorer.
-                """;
-
+        String content = platformGuideAgent.generateGuide();
         return createPdf("Comment utiliser le moteur de regles", content);
     }
 
@@ -471,60 +403,6 @@ public class DocumentationPdfService {
             ));
         }
 
-        StringBuilder rules = new StringBuilder();
-        List<Rule> ordered = ruleSet.getRules().stream().sorted((a, b) -> a.getPriority().compareTo(b.getPriority())).toList();
-        for (Rule r : ordered) {
-            String conditions = r.getConditions().stream()
-                    .map(c -> "<li><code>" + escapeHtml(c.getField()) + "</code> " + escapeHtml(c.getOperator().name()) +
-                            " <code>" + escapeHtml(c.getValue()) + "</code> <span>(" + escapeHtml(c.getValueType().name()) + ")</span></li>")
-                    .reduce("", String::concat);
-            String actions = r.getActions().stream()
-                    .map(a -> "<li><code>" + escapeHtml(a.getActionType().name()) + "</code> → <code>" +
-                            escapeHtml(a.getOutputKey()) + "</code> = <code>" + escapeHtml(a.getOutputValue()) + "</code></li>")
-                    .reduce("", String::concat);
-
-            rules.append("""
-                    <article class="rule-card">
-                      <header>
-                        <span class="prio">P%s</span>
-                        <div class="rule-head">
-                          <h4>%s</h4>
-                          <p>%s</p>
-                        </div>
-                        <span class="state %s">%s</span>
-                      </header>
-                      <div class="rule-meta">
-                        <span><b>Logique:</b> %s</span>
-                        <span><b>Score:</b> %s</span>
-                        <span><b>Conditions:</b> %s</span>
-                        <span><b>Actions:</b> %s</span>
-                      </div>
-                      <div class="detail-grid">
-                        <div>
-                          <h5>Conditions</h5>
-                          <ul>%s</ul>
-                        </div>
-                        <div>
-                          <h5>Actions</h5>
-                          <ul>%s</ul>
-                        </div>
-                      </div>
-                    </article>
-                    """.formatted(
-                    escapeHtml(String.valueOf(r.getPriority())),
-                    escapeHtml(r.getName()),
-                    escapeHtml(r.getDescription() == null ? "Sans description" : r.getDescription()),
-                    r.isEnabled() ? "ok" : "off",
-                    r.isEnabled() ? "Active" : "Inactive",
-                    escapeHtml(r.getLogicOperator().name()),
-                    escapeHtml(r.getScore() == null ? "—" : String.valueOf(r.getScore())),
-                    escapeHtml(String.valueOf(r.getConditions().size())),
-                    escapeHtml(String.valueOf(r.getActions().size())),
-                    conditions.isBlank() ? "<li>Aucune condition</li>" : conditions,
-                    actions.isBlank() ? "<li>Aucune action</li>" : actions
-            ));
-        }
-
         String doc = escapeHtml(insight.getDescription()).replace("\n", "<br/>");
         String statusClass = insight.getStatus().name().equals("ACCEPTED") ? "ok" :
                 (insight.getStatus().name().equals("REJECTED") ? "off" : "pending");
@@ -557,21 +435,6 @@ public class DocumentationPdfService {
                     .timeline-content h4 { margin:0; font-size:9.5pt; }
                     .timeline-content p { margin:2px 0 4px; font-size:8pt; color:#64748b; }
                     .timeline-content small { color:#334155; font-size:8.3pt; }
-                    .rules-grid { display: grid; gap: 10px; }
-                    .rule-card { border:1px solid #dbe4f0; border-radius:10px; padding:10px; background:#fff; }
-                    .rule-card header { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:start; }
-                    .prio { background:#dbeafe; color:#1d4ed8; border-radius:999px; padding:2px 6px; font-size:8pt; font-weight:700; }
-                    .rule-head h4 { margin:0; font-size:9.5pt; }
-                    .rule-head p { margin:1px 0 0; color:#64748b; font-size:8pt; }
-                    .state { font-size:7.5pt; padding:2px 7px; border-radius:999px; font-weight:700; }
-                    .state.ok { background:#dcfce7; color:#166534; }
-                    .state.off { background:#fee2e2; color:#991b1b; }
-                    .rule-meta { display:grid; grid-template-columns:repeat(2,1fr); gap:4px 8px; margin-top:7px; font-size:8pt; color:#334155; }
-                    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
-                    h5 { margin:0 0 4px; font-size:8.5pt; color:#0f172a; }
-                    ul { margin:0; padding-left:14px; }
-                    li { margin:0 0 3px; font-size:8pt; color:#334155; }
-                    code { background:#eff6ff; border:1px solid #bfdbfe; border-radius:4px; padding:0 3px; }
                     .footer { text-align:center; font-size:8pt; color:#64748b; padding:8px 0 12px; }
                   </style>
                 </head>
@@ -596,10 +459,6 @@ public class DocumentationPdfService {
                       <h2>Timeline versions</h2>
                       %s
                     </section>
-                    <section class="section">
-                      <h2>Détails du RuleSet</h2>
-                      <div class="rules-grid">%s</div>
-                    </section>
                     <div class="footer">RaaS - Rule Engine Documentation</div>
                   </div>
                 </body>
@@ -615,8 +474,7 @@ public class DocumentationPdfService {
                 statusClass,
                 escapeHtml(insight.getStatus().name()),
                 doc,
-                timeline.toString(),
-                rules.toString()
+                timeline.toString()
         );
     }
 

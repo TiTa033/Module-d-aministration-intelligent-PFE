@@ -62,8 +62,9 @@ public class EvaluationServiceImpl implements EvaluationService {
 
         EvaluationStrategy strategy = ruleSet.getEvaluationStrategy();
 
+        JsonNode effectiveInput = request.getInput();
         Map<String, Object> inputMap = objectMapper.convertValue(
-                request.getInput(), new TypeReference<>() {});
+                effectiveInput, new TypeReference<>() {});
 
         List<Rule> rules = ruleRepository.findAllByRuleSetIdOrderByPriorityAsc(
                 ruleSet.getId());
@@ -72,7 +73,7 @@ public class EvaluationServiceImpl implements EvaluationService {
             r.getActions().size();
         }
 
-        validateInputAgainstRuleSet(request.getInput(), rules);
+        validateInputAgainstRuleSet(effectiveInput, rules);
 
         List<Rule> matching = new ArrayList<>();
         for (Rule rule : rules) {
@@ -93,7 +94,7 @@ public class EvaluationServiceImpl implements EvaluationService {
         JsonNode matchedNode = objectMapper.valueToTree(
                 applied.stream().map(this::toMatchedSummary).toList());
 
-        String inputJson = toJson(request.getInput());
+        String inputJson = toJson(effectiveInput);
         String outputJson = toJson(outputMap);
         String matchedJson = toJson(matchedNode);
 
@@ -204,7 +205,7 @@ public class EvaluationServiceImpl implements EvaluationService {
 
     private JsonNode getNodeByPath(JsonNode root, String path) {
         JsonNode cur = root;
-        for (String p : path.split("\\\\.")) {
+        for (String p : path.split("\\.")) {
             if (cur == null) return null;
             cur = cur.get(p);
         }

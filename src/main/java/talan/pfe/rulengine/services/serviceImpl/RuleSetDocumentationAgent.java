@@ -16,7 +16,6 @@ import talan.pfe.rulengine.repositories.AiInsightRepository;
 import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.services.llm.LlmClient;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.StringJoiner;
 
@@ -45,17 +44,16 @@ public class RuleSetDocumentationAgent {
             }
 
             String systemPrompt = """
-                    Tu es un expert en règles métier financières.
-                    Tu rédiges des documentations utiles pour des gestionnaires non-techniques.
-                    Réponds uniquement en français, clair et concret.
+                    Tu es un expert en regles metier financieres.
+                    Tu rediges des documentations utiles pour des gestionnaires non-techniques.
+                    Reponds uniquement en francais, de facon claire et concrete.
                     """;
 
-            String userPrompt = buildPrompt(ruleSet);
             String content;
             try {
-                content = llmClient.generate(systemPrompt, userPrompt);
+                content = llmClient.generate(systemPrompt, buildPrompt(ruleSet));
             } catch (Exception e) {
-                log.warn("LLM unavailable for documentation generation, using fallback text: {}", e.getMessage());
+                log.warn("LLM unavailable for documentation, using fallback: {}", e.getMessage());
                 content = buildFallback(ruleSet);
             }
 
@@ -84,8 +82,8 @@ public class RuleSetDocumentationAgent {
         StringJoiner joiner = new StringJoiner("\n");
         int i = 1;
         for (Rule rule : ruleSet.getRules()) {
-            joiner.add("Règle " + i + " : " + rule.getName());
-            joiner.add("  - Priorité: " + rule.getPriority() + ", activée: " + rule.isEnabled());
+            joiner.add("Regle " + i + " : " + rule.getName());
+            joiner.add("  - Priorite: " + rule.getPriority() + ", activee: " + rule.isEnabled());
             joiner.add("  - Conditions:");
             rule.getConditions().forEach(c ->
                     joiner.add("      * " + c.getField() + " " + c.getOperator() + " " + c.getValue() + " (" + c.getValueType() + ")"));
@@ -94,40 +92,103 @@ public class RuleSetDocumentationAgent {
                     joiner.add("      * " + a.getActionType() + " => " + a.getOutputKey() + "=" + a.getOutputValue()));
             i++;
         }
+
         return """
-                Voici un RuleSet:
+                CONTEXTE : Documentation metier d'un RuleSet
+
+                Genere une documentation pedagogique et detaillee du RuleSet suivant.
+
+                RULESET :
                 Nom: %s
                 Description: %s
-                Stratégie d'évaluation: %s
-                
-                Détails des règles:
+                Strategie d'evaluation: %s
+                Nombre de regles: %d
+
+                DETAIL DES REGLES :
                 %s
-                
-                Génère une documentation concise (120 à 220 mots) en français.
-                Inclure ces sections:
-                1) Objectif du RuleSet
-                2) Comment il décide
-                3) Lecture métier des principales règles
-                4) Quand l'utiliser et limites
+
+                STRUCTURE ATTENDUE (500 a 800 mots minimum) :
+
+                [SECTION 1 - OBJECTIF ET CAS D'USAGE]
+                - Probleme metier resolu par ce RuleSet
+                - Cas d'usage concret et realiste
+                - Utilisateurs concernes (RH, risque, commercial, etc.)
+
+                [SECTION 2 - FLUX DE FONCTIONNEMENT]
+                - Explication de la strategie "%s" en detail
+                - Ordre d'execution et importance de la priorite
+
+                [SECTION 3 - EXPLICATION DE CHAQUE REGLE]
+                Pour chaque regle, redige un paragraphe expliquant son objectif metier,
+                ses conditions en langage naturel et les actions resultantes.
+
+                [SECTION 4 - SCENARIOS D'APPLICATION]
+                Donne 2 a 3 exemples concrets de donnees et leurs resultats.
+
+                [SECTION 5 - LIMITATIONS ET RISQUES]
+                - Cas non couverts par ce RuleSet
+                - Risques si mal utilise
+
+                [SECTION 6 - RECOMMANDATIONS]
+                - 2 a 3 ameliorations concretes suggerees
+
+                CRITERES DE QUALITE :
+                - Redaction accessible a un responsable metier non-technique
+                - Exemples concrets et realistes
+                - Identification des cas limites
+                - Vocabulaire metier, pas de jargon technique
                 """.formatted(
                 ruleSet.getName(),
-                ruleSet.getDescription() == null ? "(non renseignée)" : ruleSet.getDescription(),
+                ruleSet.getDescription() == null ? "(non renseignee)" : ruleSet.getDescription(),
                 ruleSet.getEvaluationStrategy(),
-                joiner
+                ruleSet.getRules().size(),
+                joiner,
+                ruleSet.getEvaluationStrategy()
         );
     }
 
     private String buildFallback(RuleSet ruleSet) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Ce RuleSet \"").append(ruleSet.getName()).append("\" applique la stratégie ")
-                .append(ruleSet.getEvaluationStrategy()).append(". ");
-        sb.append("Il contient ").append(ruleSet.getRules().size()).append(" règle(s) évaluées par ordre de priorité. ");
+
+        sb.append("## Documentation - RuleSet \"").append(ruleSet.getName()).append("\" (v")
+                .append(ruleSet.getCurrentVersion()).append(")\n\n");
+
+        sb.append("### Vue d'ensemble\n");
+        sb.append("- **Strategie d'evaluation** : ").append(ruleSet.getEvaluationStrategy()).append("\n");
+        sb.append("- **Nombre de regles** : ").append(ruleSet.getRules().size()).append("\n");
+        sb.append("- **Description metier** : ")
+                .append(ruleSet.getDescription() != null ? ruleSet.getDescription() : "Non documentee")
+                .append("\n\n");
+
+        sb.append("### Fonctionnement\n");
+        sb.append("Ce RuleSet applique la strategie ").append(ruleSet.getEvaluationStrategy())
+                .append(" pour automatiser des decisions metier.\n");
+        sb.append("Les regles sont evaluees par ordre de priorite. Voici le detail :\n\n");
+
+        int index = 1;
         for (Rule rule : ruleSet.getRules()) {
-            sb.append("La règle \"").append(rule.getName()).append("\" vérifie ")
-                    .append(rule.getConditions().size()).append(" condition(s) ")
-                    .append("et exécute ").append(rule.getActions().size()).append(" action(s). ");
+            sb.append("**Regle ").append(index).append(" : ").append(rule.getName()).append("**\n");
+            sb.append("- Priorite : ").append(rule.getPriority()).append("\n");
+            sb.append("- Etat : ").append(rule.isEnabled() ? "Activee" : "Desactivee").append("\n");
+            sb.append("- Conditions (").append(rule.getConditions().size()).append(") :\n");
+            rule.getConditions().forEach(c ->
+                    sb.append("  * ").append(c.getField()).append(" ").append(c.getOperator())
+                            .append(" ").append(c.getValue()).append("\n"));
+            sb.append("- Actions (").append(rule.getActions().size()).append(") :\n");
+            rule.getActions().forEach(a ->
+                    sb.append("  * ").append(a.getActionType()).append(" : ")
+                            .append(a.getOutputKey()).append(" = ").append(a.getOutputValue()).append("\n"));
+            sb.append("\n");
+            index++;
         }
-        sb.append("Utilisez ce RuleSet pour automatiser des décisions homogènes et auditables.");
+
+        sb.append("### Utilisation\n");
+        sb.append("Utilisez ce RuleSet pour automatiser des decisions metier de facon homogene et tracable.\n\n");
+
+        sb.append("### Note\n");
+        sb.append("Cette documentation a ete generee en mode fallback (LLM indisponible).\n");
+        sb.append("Pour une analyse complete avec cas d'usage, regenerez la documentation IA.\n");
+
         return sb.toString();
     }
 

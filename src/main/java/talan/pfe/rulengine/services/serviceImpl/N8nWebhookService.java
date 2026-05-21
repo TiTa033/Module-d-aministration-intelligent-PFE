@@ -39,46 +39,91 @@ public class N8nWebhookService {
     @Value("${n8n.webhook.timeout-ms:4000}")
     private int timeoutMs;
 
+    @Value("${n8n.collect.webhook-url:}")
+    private String collectWebhookUrl;
+
+    /** Déclenche le workflow n8n de collecte (n8n fait tout). */
+    public void triggerCollectWorkflow() {
+        if (collectWebhookUrl == null || collectWebhookUrl.isBlank()) {
+            log.warn("n8n collect webhook URL not configured — skipping");
+            return;
+        }
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("event", "COLLECT_TRIGGERED");
+            payload.put("triggeredAt", LocalDateTime.now().toString());
+            postToUrl(collectWebhookUrl, payload);
+            log.info("n8n collect workflow triggered successfully");
+        } catch (Exception e) {
+            log.warn("n8n collect webhook failed: {}", e.getMessage());
+        }
+    }
+
+    public void notifyRuleSetCreated(RuleSet ruleSet, User createdBy) {
+        if (!enabled || webhookUrl == null || webhookUrl.isBlank() || ruleSet == null) {
+            return;
+        }
+        try {
+            Map<String, Object> payload = baseRuleSetPayload(ruleSet);
+            payload.put("event", "RULESET_CREATED");
+            payload.put("createdBy", createdBy != null ? createdBy.getEmail() : null);
+            payload.put("createdAt", LocalDateTime.now());
+            postWebhook(payload);
+        } catch (Exception e) {
+            log.warn("n8n webhook (create) skipped due to error: {}", e.getMessage());
+        }
+    }
+
     public void notifyRuleSetActivated(RuleSet ruleSet, User activatedBy) {
         if (!enabled || webhookUrl == null || webhookUrl.isBlank() || ruleSet == null) {
             return;
         }
         try {
-            Map<String, Object> payload = new LinkedHashMap<>();
+            Map<String, Object> payload = baseRuleSetPayload(ruleSet);
             List<String> tenantMemberEmails = resolveTenantMemberEmails(ruleSet, activatedBy);
-
             payload.put("event", "RULESET_ACTIVATED");
-            payload.put("ruleSetId", ruleSet.getId());
-            payload.put("ruleSetName", ruleSet.getName());
-            payload.put("tenantId", ruleSet.getTenant() != null ? ruleSet.getTenant().getId() : null);
-            payload.put("tenantName", ruleSet.getTenant() != null ? ruleSet.getTenant().getName() : null);
-            payload.put("status", ruleSet.getStatus() != null ? ruleSet.getStatus().name() : null);
-            payload.put("version", ruleSet.getCurrentVersion());
-            payload.put("strategy", ruleSet.getEvaluationStrategy() != null ? ruleSet.getEvaluationStrategy().name() : null);
             payload.put("activatedBy", activatedBy != null ? activatedBy.getEmail() : null);
             payload.put("activatedAt", LocalDateTime.now());
             payload.put("tenantMemberEmails", tenantMemberEmails);
             payload.put("tenantMemberEmailsCsv", String.join(",", tenantMemberEmails));
-
-            String body = objectMapper.writeValueAsString(payload);
-            HttpRequest.Builder builder = HttpRequest.newBuilder()
-                    .uri(URI.create(webhookUrl))
-                    .timeout(Duration.ofMillis(timeoutMs))
-                    .header("Content-Type", "application/json");
-            if (webhookSecret != null && !webhookSecret.isBlank()) {
-                builder.header("X-Webhook-Secret", webhookSecret);
-            }
-            HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body)).build();
-
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofMillis(timeoutMs))
-                    .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                log.warn("n8n webhook failed with HTTP {} for RuleSet {}", response.statusCode(), ruleSet.getId());
-            }
+            postWebhook(payload);
         } catch (Exception e) {
-            log.warn("n8n webhook notification skipped due to error: {}", e.getMessage());
+            log.warn("n8n webhook (activate) skipped due to error: {}", e.getMessage());
+        }
+    }
+
+    private Map<String, Object> baseRuleSetPayload(RuleSet ruleSet) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("ruleSetId", ruleSet.getId());
+        payload.put("ruleSetName", ruleSet.getName());
+        payload.put("tenantId", ruleSet.getTenant() != null ? ruleSet.getTenant().getId() : null);
+        payload.put("tenantName", ruleSet.getTenant() != null ? ruleSet.getTenant().getName() : null);
+        payload.put("status", ruleSet.getStatus() != null ? ruleSet.getStatus().name() : null);
+        payload.put("version", ruleSet.getCurrentVersion());
+        payload.put("strategy", ruleSet.getEvaluationStrategy() != null ? ruleSet.getEvaluationStrategy().name() : null);
+        return payload;
+    }
+
+    private void postWebhook(Map<String, Object> payload) throws Exception {
+        postToUrl(webhookUrl, payload);
+    }
+
+    private void postToUrl(String url, Map<String, Object> payload) throws Exception {
+        String body = objectMapper.writeValueAsString(payload);
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMillis(timeoutMs))
+                .header("Content-Type", "application/json");
+        if (webhookSecret != null && !webhookSecret.isBlank()) {
+            builder.header("X-Webhook-Secret", webhookSecret);
+        }
+        HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body)).build();
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(timeoutMs))
+                .build();
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            log.warn("n8n webhook returned HTTP {}", response.statusCode());
         }
     }
 

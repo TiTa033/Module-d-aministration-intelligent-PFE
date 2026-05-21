@@ -2,7 +2,6 @@ package talan.pfe.rulengine.services.serviceImpl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +12,7 @@ import talan.pfe.rulengine.enums.DataType;
 import talan.pfe.rulengine.enums.LogicOperator;
 import talan.pfe.rulengine.enums.Operator;
 import talan.pfe.rulengine.repositories.*;
+import talan.pfe.rulengine.services.llm.LlmClient;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -25,7 +25,7 @@ public class RuleSimulationServiceImpl {
 
     private final EvaluationRequestRepository evaluationRequestRepository;
     private final RuleRepository ruleRepository;
-    private final ChatClient chatClient;
+    private final LlmClient llmClient;
 
     public SimulationResult simulate(Long ruleSetId, Long tenantId,
                                      SimulationRequest request) {
@@ -101,7 +101,7 @@ public class RuleSimulationServiceImpl {
                     worsenedCount, avgBefore, avgAfter);
             aiAvailable = true;
         } catch (Exception e) {
-            log.error("Groq AI unavailable during simulation: {}", e.getMessage());
+            log.error("Azure AI unavailable during simulation: {}", e.getMessage());
         }
 
         return SimulationResult.builder()
@@ -250,40 +250,43 @@ public class RuleSimulationServiceImpl {
                 .collect(Collectors.joining(", "));
     }
 
-    // ── Groq AI Analysis ──────────────────────────────────────────────────
+    // ── LLM Analysis ──────────────────────────────────────────────────────
     private String generateAiAnalysis(
             Rule original, Rule simulated, int total, int changed,
             double changePct, int improved, int worsened,
             double avgBefore, double avgAfter) {
 
-        String prompt = String.format("""
-            Tu es un expert en analyse de règles métier financières.
-            
-            Un administrateur souhaite modifier la règle suivante :
-            
-            RÈGLE ORIGINALE : "%s"
-            - Score attribué : %d points
-            - Opérateur logique : %s
-            - Nombre de conditions : %d
-            
-            RÈGLE SIMULÉE (modification proposée) : "%s"
-            - Nouveau score : %d points
-            - Nouvel opérateur : %s
-            - Nouvelles conditions : %d
-            
-            RÉSULTATS DE LA SIMULATION sur %d évaluations historiques réelles :
-            - Évaluations dont le résultat change : %d (%.1f%%)
-            - Évaluations améliorées (score monte) : %d
-            - Évaluations détériorées (score baisse) : %d
-            - Score moyen AVANT : %.1f points
-            - Score moyen APRÈS : %.1f points
-            - Delta moyen : %+.1f points
-            
-            Analyse l'impact de cette modification en 3-4 phrases claires et concises.
-            Dis si tu recommandes d'appliquer la modification ou non, et pourquoi.
-            Réponds uniquement en français, de façon professionnelle.
-            Ne commence pas par "Voici" ou "Bien sûr".
-            """,
+        String systemPrompt = """
+                Tu es un expert en analyse de règles métier financières.
+                Tu aides les administrateurs à décider si une modification de règle est bénéfique ou non.
+                Réponds uniquement en français, de façon professionnelle et concise.
+                Ne commence pas ta réponse par "Voici" ou "Bien sûr".
+                """;
+
+        String userPrompt = String.format("""
+                Un administrateur souhaite modifier la règle suivante :
+
+                RÈGLE ORIGINALE : "%s"
+                - Score attribué : %d points
+                - Opérateur logique : %s
+                - Nombre de conditions : %d
+
+                RÈGLE SIMULÉE (modification proposée) : "%s"
+                - Nouveau score : %d points
+                - Nouvel opérateur : %s
+                - Nouvelles conditions : %d
+
+                RÉSULTATS DE LA SIMULATION sur %d évaluations historiques réelles :
+                - Évaluations dont le résultat change : %d (%.1f%%)
+                - Évaluations améliorées (score monte) : %d
+                - Évaluations détériorées (score baisse) : %d
+                - Score moyen AVANT : %.1f points
+                - Score moyen APRÈS : %.1f points
+                - Delta moyen : %+.1f points
+
+                Analyse l'impact de cette modification en 3-4 phrases claires et concises.
+                Dis si tu recommandes d'appliquer la modification ou non, et pourquoi.
+                """,
                 original.getName(),
                 original.getScore() != null ? original.getScore() : 0,
                 original.getLogicOperator() != null ? original.getLogicOperator().name() : "AND",
@@ -296,9 +299,6 @@ public class RuleSimulationServiceImpl {
                 avgBefore, avgAfter, (avgAfter - avgBefore)
         );
 
-        return chatClient.prompt()
-                .user(prompt)
-                .call()
-                .content();
+        return llmClient.generate(systemPrompt, userPrompt);
     }
 }

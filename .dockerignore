@@ -1,0 +1,9 @@
+target/
+*.log
+.git/
+.idea/
+*.iml
+src/test/
+src.zip
+*.vsix
+.mvn/

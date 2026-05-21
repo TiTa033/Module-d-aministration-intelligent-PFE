@@ -49,6 +49,34 @@ public class MailService {
         }
     }
 
+    @Async
+    public void sendAnomalyDetectedEmail(List<String> emails, String title, int critical, int high, int total) {
+        if (emails == null || emails.isEmpty()) return;
+        String subject = "RaaS – Anomalies détectées : " + title;
+        String body = buildAnomalyDetectedEmailTemplate(title, critical, high, total);
+        for (String email : emails) {
+            try {
+                sendHtml(email, subject, body);
+            } catch (Exception ex) {
+                log.warn("Failed to send anomaly email to {}: {}", email, ex.getMessage());
+            }
+        }
+    }
+
+    @Async
+    public void sendExternalAnalysisReadyEmail(List<String> emails, String period, String insightTitle) {
+        if (emails == null || emails.isEmpty()) return;
+        String subject = "RaaS – Analyse externe disponible : " + period;
+        String body = buildExternalAnalysisEmailTemplate(period, insightTitle);
+        for (String email : emails) {
+            try {
+                sendHtml(email, subject, body);
+            } catch (Exception ex) {
+                log.warn("Failed to send external analysis email to {}: {}", email, ex.getMessage());
+            }
+        }
+    }
+
     private void sendHtml(String to, String subject, String html) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -104,6 +132,59 @@ public class MailService {
                 </div>
             </div>
             """.formatted(otp);
+    }
+
+    private String buildAnomalyDetectedEmailTemplate(String title, int critical, int high, int total) {
+        return """
+            <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; background: #fff5f5; border: 1px solid #fecaca; border-radius: 14px; overflow: hidden;">
+              <div style="background: linear-gradient(135deg,#dc2626,#991b1b); color: #fff; padding: 20px 22px;">
+                <h2 style="margin: 0; font-size: 22px;">⚠ Anomalies détectées</h2>
+                <p style="margin: 6px 0 0; opacity: 0.9;">Rapport automatique – Détection d'anomalies IA</p>
+              </div>
+              <div style="padding: 20px 22px; color: #1e293b;">
+                <p style="margin: 0 0 12px;">Bonjour,</p>
+                <p style="margin: 0 0 16px;">L'analyse automatique vient de détecter des anomalies dans votre système de règles métier.</p>
+                <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;">
+                  <p style="margin: 0 0 8px;"><strong>Rapport :</strong> %s</p>
+                  <p style="margin: 0 0 8px;"><strong>Total anomalies :</strong> %d</p>
+                  <p style="margin: 0 0 8px;"><strong style="color:#991b1b;">Critique(s) :</strong> %d &nbsp;|&nbsp; <strong style="color:#b91c1c;">Élevé(s) :</strong> %d</p>
+                </div>
+                <p style="margin: 0 0 14px;">Connectez-vous à la plateforme pour consulter le détail et valider ou rejeter chaque anomalie.</p>
+                <a href="http://localhost:4200/ai/anomaly-detection" style="display: inline-block; background: #dc2626; color: #fff; text-decoration: none; font-weight: 600; border-radius: 10px; padding: 10px 14px;">
+                  Voir les anomalies
+                </a>
+              </div>
+              <div style="padding: 12px 22px; border-top: 1px solid #fecaca; font-size: 12px; color: #64748b; background: #ffffff;">
+                Message automatique RaaS - merci de ne pas répondre à cet email.
+              </div>
+            </div>
+            """.formatted(title, total, critical, high);
+    }
+
+    private String buildExternalAnalysisEmailTemplate(String period, String insightTitle) {
+        return """
+            <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; background: #f0fdf4; border: 1px solid #86efac; border-radius: 14px; overflow: hidden;">
+              <div style="background: linear-gradient(135deg,#16a34a,#166534); color: #fff; padding: 20px 22px;">
+                <h2 style="margin: 0; font-size: 22px;">📊 Analyse externe disponible</h2>
+                <p style="margin: 6px 0 0; opacity: 0.9;">Rapport automatique – Collecte de données financières</p>
+              </div>
+              <div style="padding: 20px 22px; color: #1e293b;">
+                <p style="margin: 0 0 12px;">Bonjour,</p>
+                <p style="margin: 0 0 16px;">De nouvelles données financières ont été collectées et analysées pour la période <strong>%s</strong>.</p>
+                <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;">
+                  <p style="margin: 0 0 8px;"><strong>Insight :</strong> %s</p>
+                  <p style="margin: 0;"><strong>Période :</strong> %s</p>
+                </div>
+                <p style="margin: 0 0 14px;">Consultez les insights et les suggestions de règles métier dans le module Analyse Externe IA.</p>
+                <a href="http://localhost:4200/ai/external-analysis" style="display: inline-block; background: #16a34a; color: #fff; text-decoration: none; font-weight: 600; border-radius: 10px; padding: 10px 14px;">
+                  Voir l'analyse
+                </a>
+              </div>
+              <div style="padding: 12px 22px; border-top: 1px solid #86efac; font-size: 12px; color: #64748b; background: #ffffff;">
+                Message automatique RaaS - merci de ne pas répondre à cet email.
+              </div>
+            </div>
+            """.formatted(period, insightTitle, period);
     }
 
     private String buildRuleSetActivatedEmailTemplate(String tenantName, String ruleSetName, String activatedBy) {

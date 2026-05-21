@@ -1,6 +1,7 @@
 package talan.pfe.rulengine.services.serviceImpl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import talan.pfe.rulengine.dtos.request.ChatRequest;
@@ -21,32 +22,12 @@ import talan.pfe.rulengine.services.llm.LlmClient;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 import java.util.StringJoiner;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ChatService {
-    private static final Set<String> PROJECT_CONTEXT_KEYWORDS = Set.of(
-            "raas", "rule", "regle", "regles", "ruleset", "rule set",
-            "condition", "conditions", "action", "actions",
-            "strategie", "strategy", "evaluation", "evaluer",
-            "first_match", "all_match", "score",
-            "tenant", "organisation", "api", "cle",
-            "playground", "version", "rollback",
-            "import", "export", "documentation",
-            "chatbot", "insight", "audit", "notification",
-            "activer", "desactiver", "archiver", "creer",
-            "modifier", "supprimer", "comment", "pourquoi",
-            "qu est", "quelle", "quel", "aide", "help",
-            "expliqu", "montr", "liste", "affich"
-    );
-
-    private static final String OUT_OF_SCOPE_REPLY = """
-            Je suis limité au contexte de ce projet (plateforme RaaS, RuleSets, règles, conditions/actions, stratégies, API keys, évaluation, versions, import/export, documentation).
-            Reformulez votre question en lien avec ces sujets et je vous aide immédiatement.
-            """;
 
     private final CurrentUserResolver currentUserResolver;
     private final ChatConversationRepository chatConversationRepository;
@@ -65,7 +46,8 @@ public class ChatService {
                 .findByTenantIdAndUserIdOrderByUpdatedAtDesc(user.getTenant().getId(), user.getId())
                 .stream()
                 .map(conv -> {
-                    String preview = chatMessageRepository.findTop1ByConversationIdOrderByCreatedAtDesc(conv.getId())
+                    String preview = chatMessageRepository
+                            .findTop1ByConversationIdOrderByCreatedAtDesc(conv.getId())
                             .stream()
                             .findFirst()
                             .map(ChatMessage::getContent)
@@ -108,6 +90,7 @@ public class ChatService {
         Long tenantId = user.getTenant().getId();
 
         ChatConversation conversation = resolveConversation(request.getConversationId(), tenantId, user);
+
         ChatMessage userMessage = ChatMessage.builder()
                 .conversation(conversation)
                 .role(ChatRole.USER)
@@ -115,7 +98,8 @@ public class ChatService {
                 .build();
         chatMessageRepository.save(userMessage);
 
-        List<ChatMessage> recent = chatMessageRepository.findTop12ByConversationIdOrderByCreatedAtDesc(conversation.getId())
+        List<ChatMessage> recent = chatMessageRepository
+                .findTop12ByConversationIdOrderByCreatedAtDesc(conversation.getId())
                 .stream()
                 .sorted(Comparator.comparing(ChatMessage::getCreatedAt))
                 .toList();
@@ -128,18 +112,13 @@ public class ChatService {
                 .toList();
 
         String userPrompt = request.getMessage() == null ? "" : request.getMessage().trim();
+        String systemPrompt = buildSystemPrompt(user, tenantId, request.getRuleSetId());
         String reply;
-        if (!isProjectScopedQuestion(userPrompt)) {
-            reply = OUT_OF_SCOPE_REPLY;
-        } else {
-            String systemPrompt = buildSystemPrompt(user, tenantId, request.getRuleSetId());
-            try {
-                reply = llmClient.chat(systemPrompt, history, userPrompt);
-            } catch (Exception e) {
-                reply = "Je ne peux pas joindre le modèle IA pour le moment. "
-                        + "Vérifiez la configuration de la clé API LLM et réessayez. "
-                        + "Détail technique: " + sanitizeLlmError(e);
-            }
+        try {
+            reply = llmClient.chat(systemPrompt, history, userPrompt);
+        } catch (Exception e) {
+            log.error("Chat LLM error: {}", e.getMessage());
+            reply = e.getMessage() != null ? e.getMessage() : "Le service IA est temporairement indisponible.";
         }
 
         ChatMessage assistantMessage = ChatMessage.builder()
@@ -162,7 +141,8 @@ public class ChatService {
                     .user(user)
                     .build());
         }
-        return chatConversationRepository.findByIdAndTenantIdAndUserId(conversationId, tenantId, user.getId())
+        return chatConversationRepository
+                .findByIdAndTenantIdAndUserId(conversationId, tenantId, user.getId())
                 .orElseThrow(() -> new BadRequestException("Conversation introuvable."));
     }
 
@@ -172,26 +152,25 @@ public class ChatService {
                         tenantId, "", null, org.springframework.data.domain.PageRequest.of(0, 20))
                 .forEach(rs -> rsJoiner.add(rs.getName() + " (" + rs.getStatus() + ")"));
 
-        String focusedRuleSet = "Aucun RuleSet ciblé.";
+        String focusedRuleSet = "Aucun RuleSet cible.";
         if (ruleSetId != null) {
             RuleSet rs = ruleSetRepository.findByIdAndTenantId(ruleSetId, tenantId).orElse(null);
             if (rs != null) {
-                focusedRuleSet = "RuleSet ciblé: " + rs.getName() + " (stratégie=" + rs.getEvaluationStrategy() + ", statut=" + rs.getStatus() + ")";
+                focusedRuleSet = "RuleSet cible: " + rs.getName()
+                        + " (strategie=" + rs.getEvaluationStrategy()
+                        + ", statut=" + rs.getStatus() + ")";
             }
         }
 
         return """
                 Tu es l'assistant de la plateforme RaaS (Rules as a Service).
-                Tu aides des utilisateurs métier à comprendre les RuleSets et la plateforme.
-                Réponds en français, de manière concise, pratique et exacte.
-                Si une information est inconnue, dis-le clairement et propose la prochaine action.
-                N'accepte PAS les questions hors contexte projet.
-                Si la question ne concerne pas ce projet, réponds uniquement:
-                "Je suis limité au contexte de ce projet (RaaS, RuleSets, règles, stratégies, API keys, évaluation, versions, import/export, documentation)."
-                
-                Contexte utilisateur:
-                - rôle: %s
-                - tenant: %s
+                Tu aides les utilisateurs a comprendre et utiliser les RuleSets, regles, conditions, actions, strategies d'evaluation, API keys, versions, import/export et la documentation.
+                Reponds toujours en francais, de facon concise et professionnelle.
+                Si une question est hors du contexte de cette plateforme, decline poliment et invite l'utilisateur a poser une question en rapport avec RaaS.
+
+                Contexte:
+                - Role utilisateur: %s
+                - Organisation: %s
                 - RuleSets disponibles: %s
                 - %s
                 """.formatted(
@@ -202,38 +181,9 @@ public class ChatService {
         );
     }
 
-    private boolean isProjectScopedQuestion(String prompt) {
-        if (prompt == null || prompt.isBlank()) {
-            return true;
-        }
-        String normalized = java.text.Normalizer
-                .normalize(prompt.toLowerCase(Locale.ROOT), java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
-        return PROJECT_CONTEXT_KEYWORDS.stream().anyMatch(normalized::contains);
-    }
-
-    private String sanitizeLlmError(Exception e) {
-        String raw = e == null ? null : e.getMessage();
-        if (raw == null || raw.isBlank()) {
-            return "erreur LLM non détaillée";
-        }
-        String normalized = raw.replaceAll("(?i)sk-[a-z0-9_\\-]+", "[redacted-key]");
-        normalized = normalized.replaceAll("(?i)gsk_[a-z0-9_\\-]+", "[redacted-key]");
-        normalized = normalized.replace('\n', ' ').replace('\r', ' ').trim();
-        if (normalized.length() > 220) {
-            normalized = normalized.substring(0, 220) + "...";
-        }
-        return normalized;
-    }
-
     private String toPreview(String content) {
-        if (content == null || content.isBlank()) {
-            return "(message vide)";
-        }
+        if (content == null || content.isBlank()) return "(message vide)";
         String normalized = content.replace('\n', ' ').replace('\r', ' ').trim();
-        if (normalized.length() <= 80) {
-            return normalized;
-        }
-        return normalized.substring(0, 80) + "...";
+        return normalized.length() <= 80 ? normalized : normalized.substring(0, 80) + "...";
     }
 }

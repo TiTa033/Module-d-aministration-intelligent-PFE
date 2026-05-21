@@ -22,6 +22,7 @@ import talan.pfe.rulengine.repositories.RuleSetRepository;
 import talan.pfe.rulengine.repositories.TenantRepository;
 import talan.pfe.rulengine.repositories.UserRepository;
 import talan.pfe.rulengine.security.CurrentUserResolver;
+import talan.pfe.rulengine.scheduler.AnomalyDetectionScheduler;
 import talan.pfe.rulengine.services.RuleSetService;
 
 import java.util.List;
@@ -41,6 +42,7 @@ public class RuleSetServiceImpl implements RuleSetService {
     private final N8nWebhookService n8nWebhookService;
     private final UserRepository userRepository;
     private final MailService mailService;
+    private final AnomalyDetectionScheduler anomalyDetectionScheduler;
 
     @Override
     @Transactional
@@ -68,6 +70,14 @@ public class RuleSetServiceImpl implements RuleSetService {
                 AuditAction.RULESET_CREATED, "RULESET", saved.getId(),
                 null, saved.getName(),
                 tenantId, currentUserResolver.getCurrentUserId(), null);
+
+        User currentUser = null;
+        try {
+            currentUser = currentUserResolver.requireUser();
+        } catch (Exception ignored) {
+            // Keep create flow resilient even when user context is unavailable.
+        }
+        n8nWebhookService.notifyRuleSetCreated(ruleSet, currentUser);
 
         return saved;
     }
@@ -172,6 +182,7 @@ public class RuleSetServiceImpl implements RuleSetService {
         }
         notifyTenantMembersByEmail(ruleSet, currentUser);
         n8nWebhookService.notifyRuleSetActivated(ruleSet, currentUser);
+        anomalyDetectionScheduler.runOnRuleSetActivation(tenantId);
         return saved;
 
     }
