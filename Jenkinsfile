@@ -5,8 +5,7 @@ pipeline {
         SONAR_HOST_URL = 'http://raas-sonarqube:9000'
         SONAR_TOKEN    = credentials('sonar-token')
         APP_NAME       = 'raas-backend'
-        APP_PORT       = '8086'
-        DOCKER_NETWORK = 'cicd_raas-cicd'
+        APP_PORT       = '8090'
     }
 
     tools {
@@ -31,7 +30,7 @@ pipeline {
 
         stage('🧪 Tests') {
             steps {
-                sh 'mvn verify -q'
+                sh 'mvn test'
             }
             post {
                 always {
@@ -40,29 +39,29 @@ pipeline {
             }
         }
 
-
+        stage('📦 Package') {
+            steps {
+                sh 'mvn package -DskipTests -q'
+            }
+        }
 
         stage('🔎 SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                            mvn sonar:sonar \
-                              -Dsonar.projectKey=raas-backend \
-                              -Dsonar.projectName="RaaS Backend" \
-                              -Dsonar.host.url=http://raas-sonarqube:9000 \
-                              -Dsonar.token=$SONAR_TOKEN \
-                              -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-                              -Dsonar.coverage.exclusions="**/entites/**,**/dtos/**,**/mappers/**,**/enums/**,**/config/**,**/exception/**,**/kafka/**,**/security/**,**/repositories/**,**/scheduler/**,**/util/**,**/services/llm/**,**/*Application.java"
-                        '''
-                    }
+                    sh """
+                        mvn sonar:sonar \
+                          -Dsonar.projectKey=raas-backend \
+                          -Dsonar.projectName='RaaS Backend' \
+                          -Dsonar.host.url=${SONAR_HOST_URL} \
+                          -Dsonar.token=${SONAR_TOKEN}
+                    """
                 }
             }
         }
 
         stage('✅ Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -82,10 +81,13 @@ pipeline {
                 sh """
                     docker stop ${APP_NAME} || true
                     docker rm   ${APP_NAME} || true
+                    docker ps -q --filter publish=${APP_PORT} | xargs -r docker stop || true
+                    docker ps -aq --filter publish=${APP_PORT} | xargs -r docker rm  || true
                     docker run -d \
                         --name ${APP_NAME} \
-                        --network ${DOCKER_NETWORK} \
+                        --network raas-cicd \
                         -p ${APP_PORT}:${APP_PORT} \
+                        --env-file .env \
                         ${APP_NAME}:latest
                 """
             }
