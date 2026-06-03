@@ -9,6 +9,8 @@ import org.springframework.stereotype.Repository;
 import talan.pfe.rulengine.entites.Tenant;
 import talan.pfe.rulengine.enums.TenantStatus;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -33,4 +35,15 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.tenant.id = :tenantId")
     long countUsersByTenantId(@Param("tenantId") Long tenantId);
+
+    long countByStatus(TenantStatus status);
+
+    @Query("""
+        SELECT CAST(t.createdAt AS date), COUNT(t)
+        FROM Tenant t
+        WHERE t.createdAt >= :from
+        GROUP BY CAST(t.createdAt AS date)
+        ORDER BY CAST(t.createdAt AS date) ASC
+        """)
+    List<Object[]> findDailyCreationsSince(@Param("from") LocalDateTime from);
 }
