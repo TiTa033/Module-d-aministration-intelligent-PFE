@@ -1,5 +1,7 @@
 package talan.pfe.rulengine.controllers;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +17,7 @@ import talan.pfe.rulengine.services.EvaluationHistoryService;
 
 import java.time.LocalDateTime;
 
+@Tag(name = "Evaluation History", description = "Historique paginé des requêtes d'évaluation")
 @RestController
 @RequestMapping("/api/evaluations/history")
 @RequiredArgsConstructor
@@ -23,8 +26,9 @@ public class EvaluationHistoryController {
     private final EvaluationHistoryService evaluationHistoryService;
     private final JwtService jwtService;
 
+    @Operation(summary = "Lister l'historique d'évaluation (paginé, filtrable par ruleSet et période)")
     @GetMapping
-    @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER', 'VIEWER')")
     public ResponseEntity<PageResponse<EvaluationHistoryResponse>> getAll(
             @RequestHeader("Authorization") String authHeader,
             @RequestParam(required = false) Long ruleSetId,
@@ -42,8 +46,9 @@ public class EvaluationHistoryController {
                 evaluationHistoryService.getAll(tenantId, ruleSetId, from, to, pageable));
     }
 
+    @Operation(summary = "Détail d'une évaluation par identifiant")
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN', 'MANAGER', 'VIEWER')")
     public ResponseEntity<EvaluationDetailResponse> getById(
             @PathVariable Long id,
             @RequestHeader("Authorization") String authHeader) {

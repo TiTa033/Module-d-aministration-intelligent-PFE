@@ -1,0 +1,188 @@
+{
+  "name": "RaaS — External Analysis Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "id": "raas-node-0001",
+      "name": "Daily 6h00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 260]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "raas-external-analysis-trigger",
+        "responseMode": "immediatelyAfter",
+        "responseData": "noData"
+      },
+      "id": "raas-node-0002",
+      "name": "Webhook Manuel",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 460],
+      "webhookId": "raas-external-analysis-trigger"
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "raas-node-0003",
+      "name": "Merge Triggers",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [260, 360]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// COLLECTE TAVILY — 3 axes thématiques financiers\n// Variables n8n requises : TAVILY_API_KEY\n// ============================================================\nconst TAVILY_API_KEY = $vars.TAVILY_API_KEY;\nconst annee = new Date().getFullYear();\n\nconst searches = [\n  {\n    theme: 'banque_centrale',\n    label: 'Banque Centrale & Politique Monétaire',\n    query: `banque centrale europe BCE taux intérêt décision politique monétaire ${annee}`\n  },\n  {\n    theme: 'macro',\n    label: 'Indicateurs Macro-économiques',\n    query: `inflation PIB croissance chômage indicateurs économiques France Europe ${annee}`\n  },\n  {\n    theme: 'sectoriel',\n    label: 'Sectoriel Fintech & Crédit',\n    query: `fintech crédit bancaire réglementation financière secteur bancaire ${annee}`\n  }\n];\n\nconst tavilyData = {};\nconst errors = [];\n\nfor (const s of searches) {\n  try {\n    const res = await $http.request({\n      method: 'POST',\n      url: 'https://api.tavily.com/search',\n      headers: {\n        'Content-Type': 'application/json',\n        'Authorization': `Bearer ${TAVILY_API_KEY}`\n      },\n      body: JSON.stringify({\n        query: s.query,\n        search_depth: 'advanced',\n        max_results: 5,\n        include_answer: true\n      })\n    });\n\n    tavilyData[s.theme] = {\n      label: s.label,\n      answer: res.answer || '',\n      articles: (res.results || []).map(r => ({\n        title: r.title || '',\n        excerpt: (r.content || '').substring(0, 300),\n        url: r.url || ''\n      }))\n    };\n  } catch (err) {\n    errors.push(s.theme);\n    tavilyData[s.theme] = {\n      label: s.label,\n      answer: 'Données indisponibles (erreur Tavily)',\n      articles: []\n    };\n  }\n}\n\nreturn [{\n  json: {\n    tavilyData,\n    tavilyErrors: errors,\n    tavilyOk: errors.length < 3,\n    collectedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "raas-node-0004",
+      "name": "Collecte Tavily",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 360]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CONSTRUCTION DU PROMPT LLM\n// ============================================================\nconst { tavilyData, collectedAt, tavilyOk } = $input.first().json;\n\nconst dateLabel = new Date(collectedAt).toLocaleDateString('fr-FR', {\n  day: '2-digit', month: 'long', year: 'numeric'\n});\n\nconst formatTheme = (theme) => {\n  const arts = (theme.articles || [])\n    .map((a, i) => `  [${i+1}] ${a.title}\\n      ${a.excerpt}`)\n    .join('\\n');\n  return `Synthèse : ${theme.answer}\\n\\nSources récentes :\\n${arts || '  (aucune source disponible)'}\\n`;\n};\n\nconst userPrompt = `Tu es un analyste financier expert en gestion des risques bancaires.\nDate d'analyse : ${dateLabel}\n\n## DONNÉES COLLECTÉES VIA TAVILY (Web Search IA)\n\n### AXE 1 — ${tavilyData.banque_centrale.label}\n${formatTheme(tavilyData.banque_centrale)}\n\n### AXE 2 — ${tavilyData.macro.label}\n${formatTheme(tavilyData.macro)}\n\n### AXE 3 — ${tavilyData.sectoriel.label}\n${formatTheme(tavilyData.sectoriel)}\n\n## INSTRUCTIONS\nProduis une analyse structurée OBLIGATOIREMENT en 5 sections avec les marqueurs suivants :\n\n[1] RÉSUMÉ EXÉCUTIF\n(3-4 lignes. Points clés pour les décideurs.)\n\n[2] IMPACT BANQUE CENTRALE\n(Implications sur le scoring crédit, les taux de prêt, la liquidité bancaire.)\n\n[3] INDICATEURS MACRO-ÉCONOMIQUES\n(Risques liés à l'inflation, croissance, emploi pour les portefeuilles de crédit.)\n\n[4] ANALYSE SECTORIELLE\n(Évolutions réglementaires et tendances fintech/crédit à surveiller.)\n\n[5] RECOMMANDATIONS D'ADAPTATION DES RÈGLES MÉTIER\n(3 recommandations concrètes et actionnables pour adapter les règles de décision crédit.)\n\nSois concis, structuré, orienté décision opérationnelle. Réponds uniquement en français.`;\n\nreturn [{ json: { userPrompt, tavilyData, collectedAt, tavilyOk } }];"
+      },
+      "id": "raas-node-0005",
+      "name": "Construire Prompt LLM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.GROQ_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'openai/gpt-oss-120b', temperature: 0.3, max_tokens: 1500, messages: [{ role: 'system', content: 'Tu es un analyste financier expert spécialisé dans la gestion des risques bancaires et la réglementation financière. Tes analyses sont concises, structurées et orientées vers la prise de décision opérationnelle. Tu réponds toujours en français.' }, { role: 'user', content: $json.userPrompt }] }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "raas-node-0006",
+      "name": "Groq LLM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 360],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// PARSER LA RÉPONSE LLM + FALLBACK si LLM indisponible\n// ============================================================\nconst llmRaw = $input.first().json;\nconst prev = $('Construire Prompt LLM').first().json;\nconst { tavilyData, collectedAt } = prev;\n\nconst monthLabel = new Date(collectedAt).toLocaleDateString('fr-FR', {\n  month: 'long', year: 'numeric'\n});\n\nlet analysisText = '';\nlet confidence = 0.82;\nlet isFallback = false;\n\n// Vérifier si le LLM a répondu correctement\nif (llmRaw.choices && llmRaw.choices[0]?.message?.content) {\n  analysisText = llmRaw.choices[0].message.content;\n} else {\n  // Fallback — rapport brut depuis les données Tavily\n  isFallback = true;\n  confidence = 0.45;\n  analysisText = Object.values(tavilyData)\n    .map(t => `### ${t.label}\\n${t.answer}\\n${(t.articles || []).map(a => `- ${a.title}: ${a.url}`).join('\\n')}`)\n    .join('\\n\\n');\n}\n\n// Extraire une section du rapport par son numéro [N]\nconst extractSection = (text, num) => {\n  const regex = new RegExp(`\\\\[${num}\\\\][^\\\\[]*`, 's');\n  const match = text.match(regex);\n  if (!match) return '';\n  return match[0].replace(/^\\[\\d+\\][^\\n]*\\n?/, '').trim();\n};\n\nconst resume = extractSection(analysisText, 1) || analysisText.substring(0, 600);\nconst recommandations = extractSection(analysisText, 5) || 'Voir analyse complète dans contextData.';\n\nconst insight = {\n  title: isFallback\n    ? `[Fallback] Analyse Externe — ${monthLabel}`\n    : `Analyse Externe — ${monthLabel}`,\n  description: resume.substring(0, 1000),\n  suggestion: recommandations.substring(0, 1000),\n  contextData: analysisText,\n  confidence,\n  type: 'EXTERNAL_RECOMMENDATION',\n  agentType: 'EXTERNAL_ANALYSIS_AGENT',\n  isFallback,\n  collectedAt\n};\n\nreturn [{ json: insight }];"
+      },
+      "id": "raas-node-0007",
+      "name": "Parser et Fallback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.BACKEND_URL }}/api/external-analysis/ingest-insight",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-N8n-Ingest-Secret",
+              "value": "={{ $vars.N8N_INGEST_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "raas-node-0008",
+      "name": "POST Spring Boot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 360]
+    }
+  ],
+  "connections": {
+    "Daily 6h00": {
+      "main": [
+        [{ "node": "Merge Triggers", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook Manuel": {
+      "main": [
+        [{ "node": "Merge Triggers", "type": "main", "index": 1 }]
+      ]
+    },
+    "Merge Triggers": {
+      "main": [
+        [{ "node": "Collecte Tavily", "type": "main", "index": 0 }]
+      ]
+    },
+    "Collecte Tavily": {
+      "main": [
+        [{ "node": "Construire Prompt LLM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Construire Prompt LLM": {
+      "main": [
+        [{ "node": "Groq LLM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Groq LLM": {
+      "main": [
+        [{ "node": "Parser et Fallback", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parser et Fallback": {
+      "main": [
+        [{ "node": "POST Spring Boot", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "raas-external-analysis-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "raas-external-analysis-agent-v1",
+  "tags": [
+    { "name": "RaaS" },
+    { "name": "AI Agent" },
+    { "name": "External Analysis" }
+  ]
+}

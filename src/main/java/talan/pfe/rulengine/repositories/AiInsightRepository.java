@@ -3,6 +3,7 @@ package talan.pfe.rulengine.repositories;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import talan.pfe.rulengine.entites.AiInsight;
+import talan.pfe.rulengine.enums.AgentType;
 import talan.pfe.rulengine.enums.InsightType;
 
 import java.util.List;
@@ -16,4 +17,10 @@ public interface AiInsightRepository extends JpaRepository<AiInsight, Long> {
 
     Optional<AiInsight> findFirstByRuleSetIdAndTenantIdAndTypeOrderByGeneratedAtDesc(
             Long ruleSetId, Long tenantId, InsightType type);
+
+    List<AiInsight> findByTenantIdAndAgentTypeOrderByGeneratedAtDesc(
+            Long tenantId, AgentType agentType);
+
+    Optional<AiInsight> findFirstByTenantIdAndAgentTypeOrderByGeneratedAtDesc(
+            Long tenantId, AgentType agentType);
 }

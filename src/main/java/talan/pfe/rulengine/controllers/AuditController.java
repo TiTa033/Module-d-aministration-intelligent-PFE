@@ -1,5 +1,7 @@
 package talan.pfe.rulengine.controllers;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +17,7 @@ import talan.pfe.rulengine.services.AuditService;
 
 import java.time.LocalDateTime;
 
+@Tag(name = "Audit", description = "Historique des actions réalisées par les utilisateurs du tenant")
 @RestController
 @RequestMapping("/api/audit")
 @RequiredArgsConstructor
@@ -23,6 +26,7 @@ public class AuditController {
     private final AuditService auditService;
     private final JwtService jwtService;
 
+    @Operation(summary = "Lister les logs d'audit (paginé, filtrable par action, entité et période)")
     @GetMapping
     @PreAuthorize("hasAnyRole('GLOBAL_ADMIN', 'ADMIN')")
     public ResponseEntity<PageResponse<AuditLogResponse>> getAll(
