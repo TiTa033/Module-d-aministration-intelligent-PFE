@@ -11,12 +11,15 @@ volumes:
   postgres_sonar:
   prometheus_data:
   grafana_data:
+  n8n_data:
 
 services:
 
   # ─── JENKINS ────────────────────────────────────────────────────
   jenkins:
-    image: jenkins/jenkins:lts
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins
     container_name: raas-jenkins
     privileged: true
     user: root
@@ -31,6 +34,18 @@ services:
     environment:
       - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
     restart: unless-stopped
+    # ─── N8N ────────────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n
+    container_name: raas-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_SECURE_COOKIE=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - raas-cicd
 
   # ─── SONARQUBE ──────────────────────────────────────────────────
   sonarqube:
