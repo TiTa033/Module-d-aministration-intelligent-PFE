@@ -4,6 +4,7 @@ pipeline {
     environment {
         SONAR_HOST_URL = 'http://raas-sonarqube:9000'
         SONAR_TOKEN    = credentials('sonar-token')
+        DB_PASSWORD    = credentials('db-password')
         APP_NAME       = 'raas-backend'
         APP_PORT       = '8090'
         DOCKER_NETWORK = 'cicd_raas-cicd'
@@ -89,6 +90,7 @@ pipeline {
                         --name ${APP_NAME} \
                         --network cicd_raas-cicd \
                         -p ${APP_PORT}:${APP_PORT} \
+                        -e DB_PASSWORD=${DB_PASSWORD} \
                         ${APP_NAME}:latest
                 """
             }
