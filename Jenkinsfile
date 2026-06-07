@@ -6,6 +6,8 @@ pipeline {
         SONAR_TOKEN    = credentials('sonar-token')
         APP_NAME       = 'raas-backend'
         APP_PORT       = '8090'
+        DOCKER_NETWORK = 'cicd_raas-cicd'
+
     }
 
     tools {
