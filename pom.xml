@@ -312,6 +312,11 @@
                 <version>3.1.2</version>
                 <configuration>
                     <argLine>@{argLine} -Dnet.bytebuddy.experimental=true</argLine>
+                    <excludes>
+                        <exclude>**/e2e/**/*</exclude>
+                        <exclude>**/*IntegrationTest*</exclude>
+                        <exclude>**/*E2ETest*</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
         </plugins>

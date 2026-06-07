@@ -30,11 +30,7 @@ pipeline {
 
         stage('🧪 Tests') {
             steps {
-                sh '''
-                    mvn test \
-                      -Dexcludes="**/e2e/**/*,**/*IntegrationTest*,**/*E2ETest*" \
-                      -q
-                '''
+                sh 'mvn test -q'
             }
             post {
                 always {
