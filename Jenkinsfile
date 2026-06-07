@@ -93,6 +93,21 @@ pipeline {
                 """
             }
         }
+
+        stage('📊 Prometheus & Grafana') {
+            steps {
+                sh '''
+                    echo "Checking Prometheus..."
+                    curl -sf http://raas-prometheus:9090/-/healthy && echo "✅ Prometheus healthy" || echo "⚠️  Prometheus unreachable"
+
+                    echo "Checking app metrics endpoint..."
+                    curl -sf http://raas-backend:8090/actuator/prometheus | head -3 && echo "✅ App metrics reachable" || echo "⚠️  App metrics not yet available"
+
+                    echo "Checking Grafana..."
+                    curl -sf http://raas-grafana:3000/api/health && echo "✅ Grafana healthy" || echo "⚠️  Grafana unreachable"
+                '''
+            }
+        }
     }
 
     post {
