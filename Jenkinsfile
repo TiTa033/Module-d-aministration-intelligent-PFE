@@ -87,7 +87,7 @@ pipeline {
                     docker ps -aq --filter publish=${APP_PORT} | xargs -r docker rm  || true
                     docker run -d \
                         --name ${APP_NAME} \
-                        --network raas-cicd \
+                        --network cicd_raas-cicd \
                         -p ${APP_PORT}:${APP_PORT} \
                         ${APP_NAME}:latest
                 """
