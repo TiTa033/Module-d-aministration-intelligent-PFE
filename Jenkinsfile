@@ -9,6 +9,9 @@ pipeline {
         APP_PORT       = '8090'
         DOCKER_NETWORK = 'cicd_raas-cicd'
         DOCKER_IMAGE = 'tita03/raas-backend'
+        DO_HOST = '104.248.53.127'
+        DO_USER = 'deploy'
+        DO_IMAGE = 'tita03/raas-backend'
 
     }
 
@@ -103,19 +106,23 @@ pipeline {
             }
         }
 
-        stage('🚀 Deploy') {
+        stage('🚀 Deploy to DigitalOcean') {
             steps {
                 sh """
+                    ssh -o StrictHostKeyChecking=no ${DO_USER}@${DO_HOST} '
+
+                    docker pull ${DO_IMAGE}:latest
+
                     docker stop ${APP_NAME} || true
-                    docker rm   ${APP_NAME} || true
-                    docker ps -q --filter publish=${APP_PORT} | xargs -r docker stop || true
-                    docker ps -aq --filter publish=${APP_PORT} | xargs -r docker rm  || true
+                    docker rm ${APP_NAME} || true
+
                     docker run -d \
                         --name ${APP_NAME} \
-                        --network cicd_raas-cicd \
                         -p ${APP_PORT}:${APP_PORT} \
                         -e DB_PASSWORD=${DB_PASSWORD} \
-                        ${APP_NAME}:latest
+                        ${DO_IMAGE}:latest
+
+                    '
                 """
             }
         }
