@@ -8,6 +8,7 @@ pipeline {
         APP_NAME       = 'raas-backend'
         APP_PORT       = '8090'
         DOCKER_NETWORK = 'cicd_raas-cicd'
+        DOCKER_IMAGE = 'tita03/raas-backend'
 
     }
 
@@ -70,12 +71,35 @@ pipeline {
             }
         }
 
-        stage('🐳 Docker Build') {
+        stage('🐳 Docker Build & Push') {
             steps {
-                sh """
-                    docker build -t ${APP_NAME}:${BUILD_NUMBER} .
-                    docker tag ${APP_NAME}:${BUILD_NUMBER} ${APP_NAME}:latest
-                """
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+
+                    sh """
+                        echo \$DOCKER_PASS | docker login \
+                            -u \$DOCKER_USER \
+                            --password-stdin
+
+                        docker build \
+                            -t ${DOCKER_IMAGE}:${BUILD_NUMBER} .
+
+                        docker tag \
+                            ${DOCKER_IMAGE}:${BUILD_NUMBER} \
+                            ${DOCKER_IMAGE}:latest
+
+                        docker push \
+                            ${DOCKER_IMAGE}:${BUILD_NUMBER}
+
+                        docker push \
+                            ${DOCKER_IMAGE}:latest
+                    """
+                }
             }
         }
 
